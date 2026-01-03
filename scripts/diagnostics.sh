@@ -220,35 +220,6 @@ check_stream_target() {
   fi
 }
 
-check_obs_permissions() {
-  local config_root="$OBS_HOME/.config/obs-studio"
-  local owner
-
-  if [[ ! -d "$OBS_HOME" ]]; then
-    log_warn "OBS home $OBS_HOME does not exist (configure_obs.sh should create it)"
-    return
-  fi
-
-  if command -v stat >/dev/null 2>&1; then
-    owner=$(stat -c '%U:%G' "$OBS_HOME" 2>/dev/null || true)
-    if [[ -n "$owner" && "$owner" != "$STREAM_USER:$STREAM_USER" ]]; then
-      log_warn "OBS home $OBS_HOME owned by $owner (expected ${STREAM_USER}:${STREAM_USER})"
-    else
-      log_pass "OBS home $OBS_HOME ownership is ${STREAM_USER}:${STREAM_USER}"
-    fi
-  fi
-
-  if [[ -d "$config_root" ]]; then
-    if sudo -u "$STREAM_USER" test -w "$config_root" 2>/dev/null; then
-      log_pass "OBS config directory writable by ${STREAM_USER} ($config_root)"
-    else
-      log_fail "OBS config directory not writable by ${STREAM_USER} ($config_root)"
-    fi
-  else
-    log_warn "OBS config directory missing at $config_root"
-  fi
-}
-
 check_obs_logs() {
   local log_dir="$OBS_HOME/logs/obs-studio"
   [[ -d "$log_dir" ]] || log_dir="$OBS_HOME/logs"
@@ -342,7 +313,6 @@ main() {
   check_app
   check_env_file
   check_obs_config
-  check_obs_permissions
   compare_stream_keys
 
   if [[ "$SKIP_SYSTEMD" -eq 0 ]]; then
