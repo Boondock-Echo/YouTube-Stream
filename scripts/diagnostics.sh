@@ -209,7 +209,7 @@ check_env_file() {
     if [[ -f "$ENV_FILE" ]]; then
       log_warn "Env file $ENV_FILE exists but is not readable"
     else
-      log_warn "Env file $ENV_FILE missing (setup_services.sh will create a template)"
+      log_warn "Env file $ENV_FILE missing (setup_services.sh will create a template); edit it as root (sudo) and keep ownership root:root, mode 640"
     fi
   fi
 }
