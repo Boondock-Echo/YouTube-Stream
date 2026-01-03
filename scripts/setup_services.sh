@@ -62,6 +62,8 @@ Type=simple
 User=${STREAM_USER}
 WorkingDirectory=${OBS_HOME}
 Environment=HOME=${OBS_HOME}
+Environment=XDG_CONFIG_HOME=${OBS_HOME}/.config
+Environment=XDG_CACHE_HOME=${OBS_HOME}/.cache
 EnvironmentFile=${ENV_FILE}
 ExecStart=/usr/bin/xvfb-run -a obs --collection YouTubeHeadless --profile YouTubeHeadless --scene WebScene --startstreaming --minimize-to-tray --disable-updater --disable-shutdown-check
 Restart=on-failure
