@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Creates and enables systemd services for the React dev server and headless OBS streaming.
 
-STREAM_USER=${STREAM_USER:-streamer}
+STREAM_USER=${STREAM_USER:-mjhughes}
 APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 ENV_FILE=${ENV_FILE:-/etc/youtube-stream/env}

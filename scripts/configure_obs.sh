@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Creates an OBS Studio profile and scene collection for headless streaming of the React app.
 
-STREAM_USER=${STREAM_USER:-streamer}
+STREAM_USER=${STREAM_USER:-mjhughes}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 CONFIG_ROOT="$OBS_HOME/.config/obs-studio"
 CACHE_ROOT="$OBS_HOME/.cache/obs-studio"

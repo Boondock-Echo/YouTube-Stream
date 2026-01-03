@@ -11,7 +11,7 @@ This repository provides install and runtime scripts to boot a headless Ubuntu s
 - A YouTube RTMP stream key.
 
 ## Scripts overview
-- `scripts/install_dependencies.sh` — installs Node.js (20.x), OBS Studio, Xvfb, FFmpeg, and a dedicated `streamer` service user.
+- `scripts/install_dependencies.sh` — installs Node.js (20.x), OBS Studio, Xvfb, FFmpeg, and a dedicated `mjhughes` service user.
 - `scripts/bootstrap_react_app.sh` — creates a sample React app under `/opt/youtube-stream/webapp` and prepares the UI.
 - `scripts/configure_obs.sh` — writes an OBS profile/scene that captures `http://localhost:3000` via a browser source and uses your RTMP key.
 - `scripts/setup_services.sh` — creates/enables `systemd` services for the React app and headless OBS streaming.
@@ -22,14 +22,14 @@ This repository provides install and runtime scripts to boot a headless Ubuntu s
 sudo bash scripts/install_dependencies.sh
 
 # 2) Bootstrap the sample React app
-sudo STREAM_USER=streamer APP_DIR=/opt/youtube-stream/webapp bash scripts/bootstrap_react_app.sh
+sudo STREAM_USER=mjhughes APP_DIR=/opt/youtube-stream/webapp bash scripts/bootstrap_react_app.sh
 
 # 3) Configure OBS with your stream key
-sudo -E STREAM_USER=streamer OBS_HOME=/var/lib/streamer YOUTUBE_STREAM_KEY="YOUR_YT_STREAM_KEY" \
+sudo -E STREAM_USER=mjhughes OBS_HOME=/var/lib/mjhughes YOUTUBE_STREAM_KEY="YOUR_YT_STREAM_KEY" \
   bash scripts/configure_obs.sh
 
 # 4) Create services (and populate /etc/youtube-stream/env for secrets)
-sudo STREAM_USER=streamer APP_DIR=/opt/youtube-stream/webapp bash scripts/setup_services.sh
+sudo STREAM_USER=mjhughes APP_DIR=/opt/youtube-stream/webapp bash scripts/setup_services.sh
 
 # 5) Start services
 sudo systemctl start react-web.service
@@ -45,8 +45,8 @@ sudo systemctl restart obs-headless.service
 ### Customization
 - Override defaults with environment variables when running the scripts:
   - `APP_DIR` (default `/opt/youtube-stream/webapp`)
-  - `STREAM_USER` (default `streamer`)
-  - `OBS_HOME` (default `/var/lib/<STREAM_USER>`)
+  - `STREAM_USER` (default `mjhughes`)
+  - `OBS_HOME` (default `/var/lib/<STREAM_USER>`, `/var/lib/mjhughes` by default)
   - `APP_URL` (default `http://localhost:3000` in `configure_obs.sh`)
 - The systemd services restart on failure and at boot to maintain 24/7 uptime.
 
@@ -55,8 +55,8 @@ The install expects the following owners and modes:
 
 | Path | Owner:Group | Mode | Purpose |
 | --- | --- | --- | --- |
-| `/opt/youtube-stream/webapp` | `streamer:streamer` | `755` | React app tree |
-| `/var/lib/streamer` and subdirs | `streamer:streamer` | `755` | OBS home/config/cache/logs |
+| `/opt/youtube-stream/webapp` | `mjhughes:mjhughes` | `755` | React app tree |
+| `/var/lib/mjhughes` and subdirs | `mjhughes:mjhughes` | `755` | OBS home/config/cache/logs |
 | `/etc/youtube-stream` | `root:root` | `750` | Env directory |
 | `/etc/youtube-stream/env` | `root:root` | `640` | Stream key env file |
 | `/etc/systemd/system/react-web.service` | `root:root` | `644` | React systemd unit |
@@ -80,7 +80,7 @@ YOUTUBE_STREAM_KEY="YOUR_KEY" APP_URL=http://localhost:3000 \
 ```
 
 ### Troubleshooting
-If `obs-headless.service` is running under a different user than `streamer`, OBS will place its config and logs under that user’s home (for example, `/var/lib/<user>/.config/obs-studio` and `/var/lib/<user>/logs/obs-studio`). Rerun `scripts/setup_services.sh` with `STREAM_USER=streamer OBS_HOME=/var/lib/streamer` to reset the unit to the default user/path before restarting the service.
+If `obs-headless.service` is running under a different user than `mjhughes`, OBS will place its config and logs under that user’s home (for example, `/var/lib/<user>/.config/obs-studio` and `/var/lib/<user>/logs/obs-studio`). Rerun `scripts/setup_services.sh` with `STREAM_USER=mjhughes OBS_HOME=/var/lib/mjhughes` to reset the unit to the default user/path before restarting the service.
 
 Run the diagnostics script to verify dependencies, config, and service health:
 ```bash

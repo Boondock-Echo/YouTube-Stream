@@ -4,7 +4,7 @@ set -euo pipefail
 # Bootstraps a minimal React app served on port 3000.
 
 APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
-STREAM_USER=${STREAM_USER:-streamer}
+STREAM_USER=${STREAM_USER:-mjhughes}
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run this script with sudo or as root so it can manage ${APP_DIR} ownership." >&2
