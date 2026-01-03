@@ -136,6 +136,8 @@ check_obs_config() {
   local scene_file="$config_root/basic/scenes/${COLLECTION_NAME}.json"
   local service_file="$profile_dir/service.json"
   local basic_ini="$profile_dir/basic.ini"
+  local scene_registry="$config_root/basic/scene_collections.json"
+  local profile_registry="$config_root/basic/profiles.json"
 
   if [[ -d "$config_root" ]]; then
     log_pass "OBS config directory present at $config_root"
@@ -146,6 +148,8 @@ check_obs_config() {
 
   [[ -f "$scene_file" ]] && log_pass "Scene collection exists (${scene_file})" || log_fail "Scene collection missing (${scene_file})"
   [[ -f "$basic_ini" ]] && log_pass "Profile settings exist (${basic_ini})" || log_fail "Profile settings missing (${basic_ini})"
+  [[ -f "$scene_registry" ]] && log_pass "Scene collection registry exists (${scene_registry})" || log_warn "Scene collection registry missing (${scene_registry})"
+  [[ -f "$profile_registry" ]] && log_pass "Profile registry exists (${profile_registry})" || log_warn "Profile registry missing (${profile_registry})"
 
   if [[ -f "$service_file" ]]; then
     local key

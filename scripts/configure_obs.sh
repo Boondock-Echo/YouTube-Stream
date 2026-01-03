@@ -6,6 +6,7 @@ set -euo pipefail
 STREAM_USER=${STREAM_USER:-streamer}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 CONFIG_ROOT="$OBS_HOME/.config/obs-studio"
+CACHE_ROOT="$OBS_HOME/.cache/obs-studio"
 COLLECTION_NAME=${COLLECTION_NAME:-YouTubeHeadless}
 SCENE_NAME=${SCENE_NAME:-WebScene}
 SOURCE_NAME=${SOURCE_NAME:-BrowserSource}
@@ -33,7 +34,7 @@ fi
 mkdir -p "$OBS_HOME"
 chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME"
 
-mkdir -p "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}" "$CONFIG_ROOT/basic/scenes" "$OBS_HOME/logs"
+mkdir -p "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}" "$CONFIG_ROOT/basic/scenes" "$OBS_HOME/logs" "$CACHE_ROOT"
 
 # Scene collection with a single browser source pointing to the React app
 cat <<SCENE | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.json" >/dev/null
@@ -155,6 +156,28 @@ cat <<COLLECTION | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/scenes/Basic.j
 {"current_program_scene":"${SCENE_NAME}","current_scene":"${SCENE_NAME}","name":"${COLLECTION_NAME}","scene_order":[{"name":"${SCENE_NAME}"}],"sources":[]}
 COLLECTION
 
+cat <<SCENE_LIST | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/scene_collections.json" >/dev/null
+{
+  "current_scene_collection": "${COLLECTION_NAME}",
+  "scene_collections": [
+    {
+      "name": "${COLLECTION_NAME}"
+    }
+  ]
+}
+SCENE_LIST
+
+cat <<PROFILE_LIST | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/profiles.json" >/dev/null
+{
+  "current_profile": "${COLLECTION_NAME}",
+  "profiles": [
+    {
+      "name": "${COLLECTION_NAME}"
+    }
+  ]
+}
+PROFILE_LIST
+
 cat <<GLOBAL | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/global.ini" >/dev/null
 [General]
 ConfigDir=$CONFIG_ROOT
@@ -163,6 +186,6 @@ Profile=${COLLECTION_NAME}
 Collection=${COLLECTION_NAME}
 GLOBAL
 
-chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME/.config" "$OBS_HOME/logs"
+chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME/.config" "$OBS_HOME/logs" "$CACHE_ROOT"
 
 echo "OBS profile '${COLLECTION_NAME}' created for user ${STREAM_USER}."
