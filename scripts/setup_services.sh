@@ -20,13 +20,17 @@ if [ ! -f "$APP_DIR/package.json" ]; then
   exit 1
 fi
 
-mkdir -p "$(dirname "$ENV_FILE")"
+install -d -m 750 "$(dirname "$ENV_FILE")"
 if [ ! -f "$ENV_FILE" ]; then
   cat <<ENV | tee "$ENV_FILE" >/dev/null
 # Insert your YouTube stream key and restart services after editing.
 YOUTUBE_STREAM_KEY=
 ENV
-  chmod 600 "$ENV_FILE"
+  chmod 640 "$ENV_FILE"
+  chown root:root "$ENV_FILE"
+else
+  chmod 640 "$ENV_FILE"
+  chown root:root "$ENV_FILE"
 fi
 
 cat <<UNIT | tee "/etc/systemd/system/${REACT_SERVICE}" >/dev/null
@@ -50,6 +54,8 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 UNIT
+chmod 644 "/etc/systemd/system/${REACT_SERVICE}"
+chown root:root "/etc/systemd/system/${REACT_SERVICE}"
 
 cat <<UNIT | tee "/etc/systemd/system/${OBS_SERVICE}" >/dev/null
 [Unit]
@@ -72,6 +78,8 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 UNIT
+chmod 644 "/etc/systemd/system/${OBS_SERVICE}"
+chown root:root "/etc/systemd/system/${OBS_SERVICE}"
 
 systemctl daemon-reload
 systemctl enable "${REACT_SERVICE}" "${OBS_SERVICE}"

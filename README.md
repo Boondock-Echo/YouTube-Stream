@@ -50,6 +50,24 @@ sudo systemctl restart obs-headless.service
   - `APP_URL` (default `http://localhost:3000` in `configure_obs.sh`)
 - The systemd services restart on failure and at boot to maintain 24/7 uptime.
 
+### Ownership and permissions
+The install expects the following owners and modes:
+
+| Path | Owner:Group | Mode | Purpose |
+| --- | --- | --- | --- |
+| `/opt/youtube-stream/webapp` | `streamer:streamer` | `755` | React app tree |
+| `/var/lib/streamer` and subdirs | `streamer:streamer` | `755` | OBS home/config/cache/logs |
+| `/etc/youtube-stream` | `root:root` | `750` | Env directory |
+| `/etc/youtube-stream/env` | `root:root` | `640` | Stream key env file |
+| `/etc/systemd/system/react-web.service` | `root:root` | `644` | React systemd unit |
+| `/etc/systemd/system/obs-headless.service` | `root:root` | `644` | OBS systemd unit |
+
+If these drift (for example after copying files between hosts), run:
+```bash
+sudo bash scripts/fix_permissions.sh
+```
+to normalize ownership/modes.
+
 ### Manual runtime (without systemd)
 ```bash
 # Start React app
