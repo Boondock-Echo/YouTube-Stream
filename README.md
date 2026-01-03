@@ -42,6 +42,12 @@ Edit `/etc/youtube-stream/env` and set `YOUTUBE_STREAM_KEY=your_key`, then run:
 sudo systemctl restart obs-headless.service
 ```
 
+### Helper scripts
+- **Create/repair the service user** — `sudo STREAM_USER=streamer OBS_HOME=/var/lib/streamer PASSWORD="new-strong-pass" bash scripts/prepare_streamer.sh` recreates the `streamer` account (or fixes its home/permissions) and sets the password. Override `PASSWORD` so the default value in the script is never used in production.
+- **Clone this repo as the service user** — `sudo STREAM_USER=streamer bash scripts/streamer_clone_repo.sh` pulls the repo into `/var/lib/streamer/YouTube-Stream` so automated runs stay under the same UID/GID that owns OBS configs.
+- **Tear everything down** — `sudo STREAM_USER=streamer APP_DIR=/opt/youtube-stream/webapp bash scripts/reset_environment.sh` stops the systemd units, kills related processes, purges Node/OBS packages, and removes app/config paths so you can reinstall from scratch.
+- **Test with a placeholder stream key** — `sudo STREAM_USER=streamer bash scripts/run_default_config.sh` calls `configure_obs.sh` with a sample key. Only use this for local validation and replace with a real key before going live.
+
 ### Customization
 - Override defaults with environment variables when running the scripts:
   - `APP_DIR` (default `/opt/youtube-stream/webapp`)
