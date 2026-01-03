@@ -80,6 +80,8 @@ YOUTUBE_STREAM_KEY="YOUR_KEY" APP_URL=http://localhost:3000 \
 ```
 
 ### Troubleshooting
+If `obs-headless.service` is running under a different user than `streamer`, OBS will place its config and logs under that user’s home (for example, `/var/lib/<user>/.config/obs-studio` and `/var/lib/<user>/logs/obs-studio`). Rerun `scripts/setup_services.sh` with `STREAM_USER=streamer OBS_HOME=/var/lib/streamer` to reset the unit to the default user/path before restarting the service.
+
 Run the diagnostics script to verify dependencies, config, and service health:
 ```bash
 sudo bash scripts/diagnostics.sh \
