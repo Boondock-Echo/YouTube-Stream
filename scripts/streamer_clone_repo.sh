@@ -5,7 +5,7 @@ set -euo pipefail
 
 STREAM_USER=${STREAM_USER:-streamer}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
-REPO_URL=${REPO_URL:-https://github.com/your-org/YouTube-Stream.git}
+REPO_URL=${REPO_URL:-https://github.com/Boondock-Echo/YouTube-Stream.git}
 TARGET_DIR=${TARGET_DIR:-$OBS_HOME/YouTube-Stream}
 
 require_root() {
