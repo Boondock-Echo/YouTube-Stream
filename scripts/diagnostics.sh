@@ -323,6 +323,21 @@ check_obs_logs() {
   else
     log_pass "Latest OBS log ($latest) has no RTMP/output errors detected"
   fi
+
+  warn_on_obs_crash "$latest"
+}
+
+warn_on_obs_crash() {
+  local log_file="$1"
+  local crash_patterns="basic_string: construction from null|std::logic_error|terminate called|core dumped"
+
+  if grep -Eiq "$crash_patterns" "$log_file"; then
+    log_warn "Latest OBS log ($log_file) shows a crash signature (see excerpt below)"
+    grep -Ein "$crash_patterns" "$log_file" | head -n 5
+    echo "--- Recent OBS log tail ---"
+    tail -n 25 "$log_file"
+    echo "---------------------------"
+  fi
 }
 
 check_systemd_unit() {
@@ -352,8 +367,32 @@ check_systemd_unit() {
     *) log_warn "$unit status unknown ($status)" ;;
   esac
 
+  describe_unit_result "$unit"
+
   if [[ "$unit" == "$OBS_SERVICE" ]]; then
     check_obs_unit_alignment
+    stream_journal_snippet "$unit"
+  fi
+}
+
+describe_unit_result() {
+  local unit="$1"
+  local info result exec_code exec_status
+
+  info=$(systemctl show "$unit" -p Result -p ExecMainCode -p ExecMainStatus 2>/dev/null || true)
+  result=$(echo "$info" | awk -F= '/^Result=/ {print $2}')
+  exec_code=$(echo "$info" | awk -F= '/^ExecMainCode=/ {print $2}')
+  exec_status=$(echo "$info" | awk -F= '/^ExecMainStatus=/ {print $2}')
+
+  if [[ -z "$result" && -z "$exec_code" && -z "$exec_status" ]]; then
+    log_warn "$unit status details unavailable (systemctl show returned no data)"
+    return
+  fi
+
+  if [[ "$result" == "success" || "$exec_status" == "0" ]]; then
+    log_pass "$unit last result=${result:-n/a} exit=${exec_code:-n/a}/${exec_status:-n/a}"
+  else
+    log_warn "$unit last result=${result:-n/a} exit=${exec_code:-n/a}/${exec_status:-n/a} (recent failure)"
   fi
 }
 
@@ -391,6 +430,17 @@ check_obs_unit_alignment() {
   if [[ -n "$workdir" && "$workdir" != "$OBS_HOME" ]]; then
     log_warn "obs-headless.service WorkingDirectory=$workdir (expected $OBS_HOME)"
   fi
+}
+
+stream_journal_snippet() {
+  local unit="$1"
+  if ! command -v journalctl >/dev/null 2>&1; then
+    return
+  fi
+
+  echo "--- Last 20 journal entries for ${unit} ---"
+  journalctl -u "$unit" -n 20 --no-pager 2>/dev/null || true
+  echo "------------------------------------------"
 }
 
 check_network() {
