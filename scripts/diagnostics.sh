@@ -301,11 +301,22 @@ check_stream_target() {
 }
 
 check_obs_logs() {
-  local log_dir="$OBS_HOME/logs/obs-studio"
-  [[ -d "$log_dir" ]] || log_dir="$OBS_HOME/logs"
+  local log_dir=""
+  local candidates=(
+    "$OBS_HOME/.config/obs-studio/logs"
+    "$OBS_HOME/logs/obs-studio"
+    "$OBS_HOME/logs"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "$candidate" ]]; then
+      log_dir="$candidate"
+      break
+    fi
+  done
 
   if [[ ! -d "$log_dir" ]]; then
-    log_warn "OBS log directory not found at $log_dir"
+    log_warn "OBS log directory not found (checked: ${candidates[*]})"
     return
   fi
 
@@ -317,9 +328,13 @@ check_obs_logs() {
     return
   fi
 
-  if grep -Ei "rtmp|rtmps|connection failed|output fail" "$latest" >/dev/null 2>&1; then
-    log_warn "Latest OBS log ($latest) contains RTMP or output error entries"
-    grep -Ein "rtmp|rtmps|connection failed|output fail" "$latest" | head -n 5
+  local rtmp_pattern="rtmp|rtmps|connection failed|output fail"
+  if grep -Ei "$rtmp_pattern" "$latest" >/dev/null 2>&1; then
+    log_warn "Latest OBS log ($latest) contains RTMP or output error entries (showing excerpts)"
+    grep -Ein "$rtmp_pattern" "$latest" | head -n 5
+    echo "--- Recent OBS log tail ---"
+    tail -n 25 "$latest"
+    echo "---------------------------"
   else
     log_pass "Latest OBS log ($latest) has no RTMP/output errors detected"
   fi
