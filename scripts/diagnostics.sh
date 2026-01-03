@@ -351,6 +351,46 @@ check_systemd_unit() {
     failed) log_fail "$unit is failed (inspect logs via: journalctl -u $unit --no-pager)" ;;
     *) log_warn "$unit status unknown ($status)" ;;
   esac
+
+  if [[ "$unit" == "$OBS_SERVICE" ]]; then
+    check_obs_unit_alignment
+  fi
+}
+
+check_obs_unit_alignment() {
+  local info user workdir envs home_var xdg_cfg_var xdg_cache_var
+  info=$(systemctl show "$OBS_SERVICE" -p User -p WorkingDirectory -p Environment 2>/dev/null || true)
+  user=$(echo "$info" | awk -F= '/^User=/ {print $2}')
+  workdir=$(echo "$info" | awk -F= '/^WorkingDirectory=/ {print $2}')
+  envs=$(echo "$info" | awk -F= '/^Environment=/ {print $2}')
+
+  home_var=$(tr ' ' '\n' <<<"$envs" | awk -F= '/^HOME=/ {print $2; exit}')
+  xdg_cfg_var=$(tr ' ' '\n' <<<"$envs" | awk -F= '/^XDG_CONFIG_HOME=/ {print $2; exit}')
+  xdg_cache_var=$(tr ' ' '\n' <<<"$envs" | awk -F= '/^XDG_CACHE_HOME=/ {print $2; exit}')
+
+  if [[ -n "$user" && "$user" != "$STREAM_USER" ]]; then
+    log_warn "obs-headless.service runs as user '$user' (expected '${STREAM_USER}')"
+  else
+    log_pass "obs-headless.service runs as expected user '${STREAM_USER}'"
+  fi
+
+  if [[ -n "$home_var" && "$home_var" != "$OBS_HOME" ]]; then
+    log_warn "obs-headless.service HOME=$home_var (expected $OBS_HOME); logs/config will be under that path"
+  else
+    log_pass "obs-headless.service HOME points to $OBS_HOME"
+  fi
+
+  if [[ -n "$xdg_cfg_var" && "$xdg_cfg_var" != "$OBS_HOME/.config" ]]; then
+    log_warn "obs-headless.service XDG_CONFIG_HOME=$xdg_cfg_var (expected $OBS_HOME/.config)"
+  fi
+
+  if [[ -n "$xdg_cache_var" && "$xdg_cache_var" != "$OBS_HOME/.cache" ]]; then
+    log_warn "obs-headless.service XDG_CACHE_HOME=$xdg_cache_var (expected $OBS_HOME/.cache)"
+  fi
+
+  if [[ -n "$workdir" && "$workdir" != "$OBS_HOME" ]]; then
+    log_warn "obs-headless.service WorkingDirectory=$workdir (expected $OBS_HOME)"
+  fi
 }
 
 check_network() {
