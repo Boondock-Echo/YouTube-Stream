@@ -61,6 +61,15 @@ YOUTUBE_STREAM_KEY="YOUR_KEY" APP_URL=http://localhost:3000 \
   --minimize-to-tray --disable-updater --disable-shutdown-check
 ```
 
+### Troubleshooting
+Run the diagnostics script to verify dependencies, config, and service health:
+```bash
+sudo bash scripts/diagnostics.sh \
+  --skip-systemd    # (optional) skip systemd checks in containers
+  --skip-network    # (optional) skip HTTP probe to APP_URL
+  --check-build     # (optional) run npm run build --if-present inside the app
+```
+
 ### Notes
 - OBS relies on Xvfb for a virtual display; adjust resolution/FPS inside `scripts/configure_obs.sh` if desired.
 - The sample React page is a placeholder—you can modify `/opt/youtube-stream/webapp/src` and redeploy.
