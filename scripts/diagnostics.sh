@@ -92,6 +92,50 @@ check_user() {
   fi
 }
 
+check_user_permissions() {
+  if ! id -u "$STREAM_USER" >/dev/null 2>&1; then
+    log_warn "Skipping permission checks; service user ${STREAM_USER} not found"
+    return
+  fi
+
+  if ! is_root; then
+    log_warn "Run as root to verify ${STREAM_USER} directory permissions"
+    return
+  fi
+
+  local checks=(
+    "$OBS_HOME:1:OBS home directory"
+    "$OBS_HOME/.config:1:OBS config parent"
+    "$OBS_HOME/.config/obs-studio:1:OBS Studio config root"
+    "$APP_DIR:0:React app directory"
+  )
+
+  for entry in "${checks[@]}"; do
+    IFS=":" read -r path requires_write description <<<"$entry"
+
+    if [[ ! -d "$path" ]]; then
+      log_warn "Cannot check permissions; ${description} missing at $path"
+      continue
+    fi
+
+    if ! sudo -u "$STREAM_USER" test -r "$path" -a -x "$path"; then
+      log_fail "${STREAM_USER} cannot read/enter ${description} at $path"
+      continue
+    fi
+
+    if [[ "$requires_write" -eq 1 ]] && ! sudo -u "$STREAM_USER" test -w "$path"; then
+      log_fail "${STREAM_USER} cannot write to ${description} at $path"
+      continue
+    fi
+
+    if [[ "$requires_write" -eq 1 ]]; then
+      log_pass "${STREAM_USER} has read/write access to ${description} at $path"
+    else
+      log_pass "${STREAM_USER} has read access to ${description} at $path"
+    fi
+  done
+}
+
 check_app() {
   if [[ -f "$APP_DIR/package.json" ]]; then
     log_pass "React app found at $APP_DIR"
@@ -310,6 +354,7 @@ main() {
   check_command npx "npx"
   check_node_version
   check_user
+  check_user_permissions
   check_app
   check_env_file
   check_obs_config
