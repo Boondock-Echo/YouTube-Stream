@@ -330,11 +330,12 @@ check_obs_logs() {
     return
   fi
 
-  local rtmp_pattern="rtmp|rtmps|connection failed|output fail"
-  if grep -Ei "$rtmp_pattern" "$latest" >/dev/null 2>&1; then
+  # Catch common RTMP/output failures (connection refusals, auth errors, timeouts)
+  local rtmp_error_pattern="((rtmp|rtmps).*(fail|error|refused|timeout|disconnect|denied|auth|invalid|could not|failed to connect))|(output.*(fail|error))"
+  if grep -Ei "$rtmp_error_pattern" "$latest" >/dev/null 2>&1; then
     log_warn "Latest OBS log ($latest) contains RTMP or output error entries (see OBS log excerpts below)"
     local rtmp_matches log_tail
-    rtmp_matches=$(grep -Ein "$rtmp_pattern" "$latest" | head -n 5 || true)
+    rtmp_matches=$(grep -Ein "$rtmp_error_pattern" "$latest" | head -n 5 || true)
     log_tail=$(tail -n 25 "$latest" || true)
     append_obs_log_note "$(cat <<EOF
 Latest OBS log ($latest) RTMP/output excerpts:
