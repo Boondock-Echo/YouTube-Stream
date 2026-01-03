@@ -68,6 +68,22 @@ format_stream_key() {
   fi
 }
 
+normalize_stream_key() {
+  local key="${1%$'\r'}"
+  key="${key#"${key%%[![:space:]]*}"}"
+  key="${key%"${key##*[![:space:]]}"}"
+
+  if [[ ${#key} -ge 2 ]]; then
+    local first=${key:0:1}
+    local last=${key: -1}
+    if [[ ( "$first" == '"' && "$last" == '"' ) || ( "$first" == "'" && "$last" == "'" ) ]]; then
+      key="${key:1:-1}"
+    fi
+  fi
+
+  printf '%s' "$key"
+}
+
 is_root() {
   [[ "$(id -u)" -eq 0 ]]
 }
@@ -213,12 +229,13 @@ check_app() {
 }
 
 check_env_file() {
+  local raw_key file_key env_key
   if [[ -r "$ENV_FILE" ]]; then
-    local key
-    key=$(grep -E "^YOUTUBE_STREAM_KEY=" "$ENV_FILE" | head -n1 | cut -d'=' -f2-)
-    ENV_STREAM_KEY="$key"
-    if [[ -n "$key" ]]; then
+    raw_key=$(grep -E "^YOUTUBE_STREAM_KEY=" "$ENV_FILE" | head -n1 | cut -d'=' -f2-)
+    file_key=$(normalize_stream_key "$raw_key")
+    if [[ -n "$file_key" ]]; then
       log_pass "YOUTUBE_STREAM_KEY set in $ENV_FILE"
+      ENV_STREAM_KEY="$file_key"
     else
       log_warn "YOUTUBE_STREAM_KEY is empty in $ENV_FILE"
     fi
@@ -228,6 +245,21 @@ check_env_file() {
     else
       log_warn "Env file $ENV_FILE missing (setup_services.sh will create a template); edit it as root (sudo) and keep ownership root:root, mode 640"
     fi
+  fi
+
+  env_key=$(normalize_stream_key "${YOUTUBE_STREAM_KEY:-}")
+  if [[ -n "$env_key" ]]; then
+    if [[ -n "$file_key" && "$file_key" != "$env_key" ]]; then
+      log_warn "YOUTUBE_STREAM_KEY in environment differs from $ENV_FILE: env $(format_stream_key "$env_key") vs file $(format_stream_key "$file_key")"
+    fi
+    if [[ -z "$ENV_STREAM_KEY" ]]; then
+      ENV_STREAM_KEY="$env_key"
+      log_pass "Using YOUTUBE_STREAM_KEY from environment"
+    fi
+  fi
+
+  if [[ -z "$ENV_STREAM_KEY" ]]; then
+    log_warn "YOUTUBE_STREAM_KEY not set in environment or $ENV_FILE"
   fi
 }
 
@@ -255,6 +287,7 @@ check_obs_config() {
   if [[ -f "$service_file" ]]; then
     local key
     key=$(grep -oE '"key"[[:space:]]*:[[:space:]]*"[^"]*"' "$service_file" | head -n1 | sed 's/.*"key"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/')
+    key=$(normalize_stream_key "$key")
     SERVICE_STREAM_KEY="$key"
     if [[ -n "$key" ]]; then
       log_pass "OBS service.json contains a stream key"
