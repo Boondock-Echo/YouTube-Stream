@@ -6,14 +6,14 @@ set -euo pipefail
 # which step in the setup is failing.
 #
 # Usage:
-#   sudo STREAM_USER=streamer APP_DIR=/opt/youtube-stream/webapp bash scripts/diagnostics.sh
+#   sudo STREAM_USER=mjhughes APP_DIR=/opt/youtube-stream/webapp bash scripts/diagnostics.sh
 # Flags:
 #   --skip-systemd   Skip systemd unit checks (useful in containers without systemd)
 #   --skip-network   Skip the HTTP check against APP_URL
 #   --check-build    Run `npm run build --if-present` to validate the React app
 
 APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
-STREAM_USER=${STREAM_USER:-streamer}
+STREAM_USER=${STREAM_USER:-mjhughes}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 ENV_FILE=${ENV_FILE:-/etc/youtube-stream/env}
 APP_URL=${APP_URL:-http://localhost:3000}
