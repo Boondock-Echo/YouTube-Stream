@@ -136,6 +136,42 @@ check_user_permissions() {
   done
 }
 
+describe_permissions() {
+  if ! is_root; then
+    log_warn "Run as root to verify detailed ownership and permissions"
+    return
+  fi
+
+  local entries=(
+    "$APP_DIR:${STREAM_USER}:${STREAM_USER}:755:App directory"
+    "$OBS_HOME:${STREAM_USER}:${STREAM_USER}:755:OBS home directory"
+    "$OBS_HOME/.config:${STREAM_USER}:${STREAM_USER}:755:OBS config parent"
+    "$OBS_HOME/.config/obs-studio:${STREAM_USER}:${STREAM_USER}:755:OBS Studio config root"
+    "$(dirname "$ENV_FILE"):root:root:750:Env directory"
+    "$ENV_FILE:root:root:640:Env file"
+    "/etc/systemd/system/${REACT_SERVICE}:root:root:644:Systemd unit (${REACT_SERVICE})"
+    "/etc/systemd/system/${OBS_SERVICE}:root:root:644:Systemd unit (${OBS_SERVICE})"
+  )
+
+  for entry in "${entries[@]}"; do
+    IFS=":" read -r path owner group mode label <<<"$entry"
+    if [[ ! -e "$path" ]]; then
+      log_warn "Cannot inspect $label at $path (missing)"
+      continue
+    fi
+    local actual_owner actual_group actual_mode
+    actual_owner=$(stat -c '%U' "$path")
+    actual_group=$(stat -c '%G' "$path")
+    actual_mode=$(stat -c '%a' "$path")
+
+    if [[ "$actual_owner" == "$owner" && "$actual_group" == "$group" && "$actual_mode" == "$mode" ]]; then
+      log_pass "$label ownership ${owner}:${group} with mode ${mode}"
+    else
+      log_warn "$label ownership/mode is ${actual_owner}:${actual_group} (${actual_mode}), expected ${owner}:${group} (${mode})"
+    fi
+  done
+}
+
 check_app() {
   if [[ -f "$APP_DIR/package.json" ]]; then
     log_pass "React app found at $APP_DIR"
@@ -357,6 +393,7 @@ main() {
   check_user_permissions
   check_app
   check_env_file
+  describe_permissions
   check_obs_config
   compare_stream_keys
 
