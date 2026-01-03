@@ -17,6 +17,7 @@ STREAM_USER=${STREAM_USER:-streamer}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 ENV_FILE=${ENV_FILE:-/etc/youtube-stream/env}
 APP_URL=${APP_URL:-http://localhost:3000}
+STREAM_URL=${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}
 COLLECTION_NAME=${COLLECTION_NAME:-YouTubeHeadless}
 SCENE_NAME=${SCENE_NAME:-WebScene}
 REACT_SERVICE=react-web.service
@@ -43,6 +44,8 @@ done
 passes=()
 warnings=()
 failures=()
+ENV_STREAM_KEY=""
+SERVICE_STREAM_KEY=""
 
 log_pass() { passes+=("$1"); printf '[PASS] %s\n' "$1"; }
 log_warn() { warnings+=("$1"); printf '[WARN] %s\n' "$1"; }
@@ -116,6 +119,7 @@ check_env_file() {
   if [[ -r "$ENV_FILE" ]]; then
     local key
     key=$(grep -E "^YOUTUBE_STREAM_KEY=" "$ENV_FILE" | head -n1 | cut -d'=' -f2-)
+    ENV_STREAM_KEY="$key"
     if [[ -n "$key" ]]; then
       log_pass "YOUTUBE_STREAM_KEY set in $ENV_FILE"
     else
@@ -154,6 +158,7 @@ check_obs_config() {
   if [[ -f "$service_file" ]]; then
     local key
     key=$(grep -oE '"key"[[:space:]]*:[[:space:]]*"[^"]*"' "$service_file" | head -n1 | sed 's/.*"key"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/')
+    SERVICE_STREAM_KEY="$key"
     if [[ -n "$key" ]]; then
       log_pass "OBS service.json contains a stream key"
     else
@@ -161,6 +166,111 @@ check_obs_config() {
     fi
   else
     log_fail "OBS service.json missing (${service_file})"
+  fi
+}
+
+compare_stream_keys() {
+  if [[ -n "$ENV_STREAM_KEY" && -n "$SERVICE_STREAM_KEY" ]]; then
+    if [[ "$ENV_STREAM_KEY" == "$SERVICE_STREAM_KEY" ]]; then
+      log_pass "Stream key matches between $ENV_FILE and service.json"
+    else
+      log_warn "Stream key in $ENV_FILE differs from service.json (rerun configure_obs.sh)"
+    fi
+  fi
+}
+
+check_stream_target() {
+  local proto host port hostport
+  if [[ "$STREAM_URL" == rtmps://* ]]; then
+    proto="rtmps"
+    hostport="${STREAM_URL#rtmps://}"
+  else
+    proto="rtmp"
+    hostport="${STREAM_URL#rtmp://}"
+  fi
+
+  hostport="${hostport%%/*}"
+  host="${hostport%%:*}"
+  port="${hostport##*:}"
+
+  if [[ "$host" == "$hostport" ]]; then
+    port=$([[ "$proto" == "rtmps" ]] && echo 443 || echo 1935)
+  fi
+
+  if [[ -z "$host" ]]; then
+    log_warn "Unable to parse host from STREAM_URL ($STREAM_URL)"
+    return
+  fi
+
+  if getent hosts "$host" >/dev/null 2>&1; then
+    log_pass "Resolved RTMP host $host"
+  else
+    log_fail "Could not resolve RTMP host $host"
+    return
+  fi
+
+  if command -v timeout >/dev/null 2>&1; then
+    if timeout 5 bash -c ">/dev/tcp/$host/$port" 2>/dev/null; then
+      log_pass "TCP connectivity to $host:$port for $proto verified"
+    else
+      log_warn "TCP check to $host:$port failed (firewall or network issue?)"
+    fi
+  else
+    log_warn "timeout not available; skipping RTMP TCP connectivity check"
+  fi
+}
+
+check_obs_permissions() {
+  local config_root="$OBS_HOME/.config/obs-studio"
+  local owner
+
+  if [[ ! -d "$OBS_HOME" ]]; then
+    log_warn "OBS home $OBS_HOME does not exist (configure_obs.sh should create it)"
+    return
+  fi
+
+  if command -v stat >/dev/null 2>&1; then
+    owner=$(stat -c '%U:%G' "$OBS_HOME" 2>/dev/null || true)
+    if [[ -n "$owner" && "$owner" != "$STREAM_USER:$STREAM_USER" ]]; then
+      log_warn "OBS home $OBS_HOME owned by $owner (expected ${STREAM_USER}:${STREAM_USER})"
+    else
+      log_pass "OBS home $OBS_HOME ownership is ${STREAM_USER}:${STREAM_USER}"
+    fi
+  fi
+
+  if [[ -d "$config_root" ]]; then
+    if sudo -u "$STREAM_USER" test -w "$config_root" 2>/dev/null; then
+      log_pass "OBS config directory writable by ${STREAM_USER} ($config_root)"
+    else
+      log_fail "OBS config directory not writable by ${STREAM_USER} ($config_root)"
+    fi
+  else
+    log_warn "OBS config directory missing at $config_root"
+  fi
+}
+
+check_obs_logs() {
+  local log_dir="$OBS_HOME/logs/obs-studio"
+  [[ -d "$log_dir" ]] || log_dir="$OBS_HOME/logs"
+
+  if [[ ! -d "$log_dir" ]]; then
+    log_warn "OBS log directory not found at $log_dir"
+    return
+  fi
+
+  local latest
+  latest=$(find "$log_dir" -maxdepth 1 -type f -name "*.txt" -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)
+
+  if [[ -z "$latest" ]]; then
+    log_warn "No OBS log files found in $log_dir"
+    return
+  fi
+
+  if grep -Ei "rtmp|rtmps|connection failed|output fail" "$latest" >/dev/null 2>&1; then
+    log_warn "Latest OBS log ($latest) contains RTMP or output error entries"
+    grep -Ein "rtmp|rtmps|connection failed|output fail" "$latest" | head -n 5
+  else
+    log_pass "Latest OBS log ($latest) has no RTMP/output errors detected"
   fi
 }
 
@@ -232,6 +342,8 @@ main() {
   check_app
   check_env_file
   check_obs_config
+  check_obs_permissions
+  compare_stream_keys
 
   if [[ "$SKIP_SYSTEMD" -eq 0 ]]; then
     check_systemd_unit "$REACT_SERVICE"
@@ -240,7 +352,9 @@ main() {
     log_warn "Skipping systemd unit checks"
   fi
 
+  check_stream_target
   check_network
+  check_obs_logs
 
   echo
   echo "=== Summary ==="
