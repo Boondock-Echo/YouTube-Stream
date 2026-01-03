@@ -13,6 +13,16 @@ STREAM_KEY=${YOUTUBE_STREAM_KEY:-}
 STREAM_URL=${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}
 APP_URL=${APP_URL:-http://localhost:3000}
 
+# Ensure the service user exists and has a home directory. Without this, OBS will
+# segfault on startup when it cannot resolve config paths (manifesting as
+# `basic_string: construction from null is not valid`).
+if ! id -u "$STREAM_USER" >/dev/null 2>&1; then
+  useradd --system --create-home --home-dir "$OBS_HOME" --shell /bin/bash "$STREAM_USER"
+fi
+
+mkdir -p "$OBS_HOME"
+chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME"
+
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run this script with sudo or as root so it can write OBS config files." >&2
   exit 1
@@ -24,7 +34,6 @@ if [ -z "$STREAM_KEY" ]; then
 fi
 
 mkdir -p "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}" "$CONFIG_ROOT/basic/scenes" "$OBS_HOME/logs"
-chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME"
 
 # Scene collection with a single browser source pointing to the React app
 cat <<SCENE | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.json" >/dev/null
