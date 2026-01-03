@@ -26,6 +26,7 @@ OBS_SERVICE=obs-headless.service
 SKIP_SYSTEMD=0
 SKIP_NETWORK=0
 CHECK_BUILD=0
+LATEST_OBS_LOG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -353,32 +354,12 @@ check_stream_target() {
 }
 
 check_obs_logs() {
-  local log_dir=""
-  local candidates=(
-    "$OBS_HOME/.config/obs-studio/logs"
-    "$OBS_HOME/logs/obs-studio"
-    "$OBS_HOME/logs"
-  )
-
-  for candidate in "${candidates[@]}"; do
-    if [[ -d "$candidate" ]]; then
-      log_dir="$candidate"
-      break
-    fi
-  done
-
-  if [[ ! -d "$log_dir" ]]; then
-    log_warn "OBS log directory not found (checked: ${candidates[*]})"
+  if ! find_latest_obs_log; then
     return
   fi
 
-  local latest
-  latest=$(find "$log_dir" -maxdepth 1 -type f -name "*.txt" -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)
-
-  if [[ -z "$latest" ]]; then
-    log_warn "No OBS log files found in $log_dir"
-    return
-  fi
+  local latest="$LATEST_OBS_LOG"
+  log_pass "Latest OBS log detected at $latest"
 
   # Catch common RTMP/output failures (connection refusals, auth errors, timeouts)
   local rtmp_error_pattern="((rtmp|rtmps).*(fail|error|refused|timeout|disconnect|denied|auth|invalid|could not|failed to connect))|(output.*(fail|error))"
@@ -454,27 +435,50 @@ check_systemd_unit() {
   if [[ "$unit" == "$OBS_SERVICE" ]]; then
     check_obs_unit_alignment
     stream_journal_snippet "$unit"
+    if [[ "$status" != "active" ]]; then
+      print_latest_obs_log_tail
+    fi
   fi
 }
 
 describe_unit_result() {
   local unit="$1"
-  local info result exec_code exec_status
+  local info result exec_code exec_status active_state sub_state status_text active_enter inactive_enter active_exit inactive_exit
 
-  info=$(systemctl show "$unit" -p Result -p ExecMainCode -p ExecMainStatus 2>/dev/null || true)
+  info=$(systemctl show "$unit" -p Result -p ExecMainCode -p ExecMainStatus -p ActiveState -p SubState -p StatusText -p ActiveEnterTimestamp -p InactiveEnterTimestamp -p ActiveExitTimestamp -p InactiveExitTimestamp 2>/dev/null || true)
   result=$(echo "$info" | awk -F= '/^Result=/ {print $2}')
   exec_code=$(echo "$info" | awk -F= '/^ExecMainCode=/ {print $2}')
   exec_status=$(echo "$info" | awk -F= '/^ExecMainStatus=/ {print $2}')
+  active_state=$(echo "$info" | awk -F= '/^ActiveState=/ {print $2}')
+  sub_state=$(echo "$info" | awk -F= '/^SubState=/ {print $2}')
+  status_text=$(echo "$info" | awk -F= '/^StatusText=/ {print $2}')
+  active_enter=$(echo "$info" | awk -F= '/^ActiveEnterTimestamp=/ {print $2}')
+  inactive_enter=$(echo "$info" | awk -F= '/^InactiveEnterTimestamp=/ {print $2}')
+  active_exit=$(echo "$info" | awk -F= '/^ActiveExitTimestamp=/ {print $2}')
+  inactive_exit=$(echo "$info" | awk -F= '/^InactiveExitTimestamp=/ {print $2}')
 
-  if [[ -z "$result" && -z "$exec_code" && -z "$exec_status" ]]; then
+  if [[ -z "$result" && -z "$exec_code" && -z "$exec_status" && -z "$active_state" ]]; then
     log_warn "$unit status details unavailable (systemctl show returned no data)"
     return
   fi
 
+  local state_summary="state=${active_state:-n/a}/${sub_state:-n/a}"
   if [[ "$result" == "success" || "$exec_status" == "0" ]]; then
-    log_pass "$unit last result=${result:-n/a} exit=${exec_code:-n/a}/${exec_status:-n/a}"
+    log_pass "$unit last result=${result:-n/a} exit=${exec_code:-n/a}/${exec_status:-n/a} (${state_summary})"
   else
-    log_warn "$unit last result=${result:-n/a} exit=${exec_code:-n/a}/${exec_status:-n/a} (recent failure)"
+    log_warn "$unit last result=${result:-n/a} exit=${exec_code:-n/a}/${exec_status:-n/a} (${state_summary}, recent failure)"
+    if [[ -n "$status_text" && "$status_text" != "-" ]]; then
+      log_warn "$unit status text: $status_text"
+    fi
+
+    local timeline=()
+    [[ -n "$inactive_enter" && "$inactive_enter" != "-" ]] && timeline+=("inactive since $inactive_enter")
+    [[ -n "$active_enter" && "$active_enter" != "-" ]] && timeline+=("last active at $active_enter")
+    [[ -n "$active_exit" && "$active_exit" != "-" ]] && timeline+=("last exit at $active_exit")
+    [[ -n "$inactive_exit" && "$inactive_exit" != "-" ]] && timeline+=("last restart from inactive at $inactive_exit")
+    if [[ ${#timeline[@]} -gt 0 ]]; then
+      log_warn "$unit transition history: ${timeline[*]}"
+    fi
   fi
 }
 
@@ -523,6 +527,48 @@ stream_journal_snippet() {
   echo "--- Last 20 journal entries for ${unit} ---"
   journalctl -u "$unit" -n 20 --no-pager 2>/dev/null || true
   echo "------------------------------------------"
+}
+
+find_latest_obs_log() {
+  local log_dir=""
+  local candidates=(
+    "$OBS_HOME/.config/obs-studio/logs"
+    "$OBS_HOME/logs/obs-studio"
+    "$OBS_HOME/logs"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "$candidate" ]]; then
+      log_dir="$candidate"
+      break
+    fi
+  done
+
+  if [[ ! -d "$log_dir" ]]; then
+    log_warn "OBS log directory not found (checked: ${candidates[*]})"
+    return 1
+  fi
+
+  local latest
+  latest=$(find "$log_dir" -maxdepth 1 -type f -name "*.txt" -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)
+
+  if [[ -z "$latest" ]]; then
+    log_warn "No OBS log files found in $log_dir"
+    return 1
+  fi
+
+  LATEST_OBS_LOG="$latest"
+  return 0
+}
+
+print_latest_obs_log_tail() {
+  if [[ -z "$LATEST_OBS_LOG" ]]; then
+    find_latest_obs_log || return
+  fi
+
+  echo "--- Tail of latest OBS log (${LATEST_OBS_LOG}) ---"
+  tail -n 40 "$LATEST_OBS_LOG" 2>/dev/null || true
+  echo "-----------------------------------------------"
 }
 
 check_network() {
