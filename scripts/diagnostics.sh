@@ -301,11 +301,22 @@ check_stream_target() {
 }
 
 check_obs_logs() {
-  local log_dir="$OBS_HOME/logs/obs-studio"
-  [[ -d "$log_dir" ]] || log_dir="$OBS_HOME/logs"
+  local log_dir=""
+  local candidates=(
+    "$OBS_HOME/.config/obs-studio/logs"
+    "$OBS_HOME/logs/obs-studio"
+    "$OBS_HOME/logs"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "$candidate" ]]; then
+      log_dir="$candidate"
+      break
+    fi
+  done
 
   if [[ ! -d "$log_dir" ]]; then
-    log_warn "OBS log directory not found at $log_dir"
+    log_warn "OBS log directory not found (checked: ${candidates[*]})"
     return
   fi
 
