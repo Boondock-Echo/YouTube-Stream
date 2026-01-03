@@ -13,16 +13,10 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
-require_sudo() {
-  if [ "$(id -u)" -ne 0 ]; then
-    if ! command_exists sudo; then
-      echo "This script requires root privileges or sudo installed." >&2
-      exit 1
-    fi
-  fi
-}
-
-require_sudo
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Run this script with sudo or as root so it can install packages and manage ${STREAM_USER}." >&2
+  exit 1
+fi
 
 # Update apt metadata and install base tools
 apt-get update
