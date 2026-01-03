@@ -15,6 +15,15 @@ STREAM_KEY=${YOUTUBE_STREAM_KEY:-${STREAM_KEY:-}}
 STREAM_URL=${STREAM_URL:-}
 APP_URL=${APP_URL:-}
 
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN=python
+else
+  echo "Python is required to run this script. Please install Python 3." >&2
+  exit 1
+fi
+
 prompt_for_value() {
   local variable_name=$1
   local prompt_text=$2
@@ -45,7 +54,7 @@ prompt_for_value() {
 
 load_config() {
   eval "$(
-    python - <<'PY' "$CONFIG_FILE"
+    "$PYTHON_BIN" - <<'PY' "$CONFIG_FILE"
 import json, shlex, sys
 path = sys.argv[1]
 with open(path, "r", encoding="utf-8") as f:
@@ -58,7 +67,7 @@ PY
 }
 
 write_config() {
-  python - <<'PY' "$CONFIG_FILE" "$STREAM_USER" "$OBS_HOME" "$COLLECTION_NAME" "$SCENE_NAME" "$SOURCE_NAME" "$STREAM_KEY" "$STREAM_URL" "$APP_URL"
+  "$PYTHON_BIN" - <<'PY' "$CONFIG_FILE" "$STREAM_USER" "$OBS_HOME" "$COLLECTION_NAME" "$SCENE_NAME" "$SOURCE_NAME" "$STREAM_KEY" "$STREAM_URL" "$APP_URL"
 import json, sys
 path = sys.argv[1]
 keys = ["STREAM_USER", "OBS_HOME", "COLLECTION_NAME", "SCENE_NAME", "SOURCE_NAME", "STREAM_KEY", "STREAM_URL", "APP_URL"]
