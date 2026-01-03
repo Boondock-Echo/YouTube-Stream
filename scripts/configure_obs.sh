@@ -14,13 +14,16 @@ STREAM_KEY=${YOUTUBE_STREAM_KEY:-}
 STREAM_URL=${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}
 APP_URL=${APP_URL:-http://localhost:3000}
 
-if [ "$(id -u)" -ne 0 ]; then
-  echo "Run this script with sudo or as root so it can write OBS config files." >&2
+current_user=$(id -un)
+current_uid=$(id -u)
+
+if [[ -z "$STREAM_KEY" ]]; then
+  echo "Set YOUTUBE_STREAM_KEY in the environment before running this script." >&2
   exit 1
 fi
 
-if [ -z "$STREAM_KEY" ]; then
-  echo "Set YOUTUBE_STREAM_KEY in the environment before running this script." >&2
+if [[ "$current_user" != "$STREAM_USER" && "$current_uid" -ne 0 ]]; then
+  echo "Run this script as root or ${STREAM_USER} so it can prepare the OBS profile." >&2
   exit 1
 fi
 
@@ -28,16 +31,31 @@ fi
 # segfault on startup when it cannot resolve config paths (manifesting as
 # `basic_string: construction from null is not valid`).
 if ! id -u "$STREAM_USER" >/dev/null 2>&1; then
-  useradd --system --create-home --home-dir "$OBS_HOME" --shell /bin/bash "$STREAM_USER"
+  if [[ "$current_uid" -eq 0 ]]; then
+    useradd --system --create-home --home-dir "$OBS_HOME" --shell /bin/bash "$STREAM_USER"
+  else
+    echo "Service user ${STREAM_USER} is missing. Run this script as root or run install_dependencies.sh first." >&2
+    exit 1
+  fi
 fi
 
 mkdir -p "$OBS_HOME"
-chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME"
+if [[ "$current_uid" -eq 0 ]]; then
+  chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME"
+fi
 
 mkdir -p "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}" "$CONFIG_ROOT/basic/scenes" "$OBS_HOME/logs" "$CACHE_ROOT"
 
+run_as_streamer() {
+  if [[ "$current_user" == "$STREAM_USER" ]]; then
+    "$@"
+  else
+    sudo -u "$STREAM_USER" "$@"
+  fi
+}
+
 # Scene collection with a single browser source pointing to the React app
-cat <<SCENE | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.json" >/dev/null
+cat <<SCENE | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.json" >/dev/null
 {
   "current_program_scene": "${SCENE_NAME}",
   "current_scene": "${SCENE_NAME}",
@@ -117,7 +135,7 @@ cat <<SCENE | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/scenes/${COLLECTION
 SCENE
 
 # Streaming profile pointing at YouTube RTMP with the supplied stream key
-cat <<PROFILE | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}/basic.ini" >/dev/null
+cat <<PROFILE | run_as_streamer tee "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}/basic.ini" >/dev/null
 [General]
 Name=${COLLECTION_NAME}
 
@@ -142,7 +160,7 @@ Preset=veryfast
 RateControl=CBR
 PROFILE
 
-cat <<SERVICE | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}/service.json" >/dev/null
+cat <<SERVICE | run_as_streamer tee "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}/service.json" >/dev/null
 {
   "settings": {
     "key": "${STREAM_KEY}",
@@ -152,11 +170,11 @@ cat <<SERVICE | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/profiles/${COLLEC
 }
 SERVICE
 
-cat <<COLLECTION | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/scenes/Basic.json" >/dev/null
+cat <<COLLECTION | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/Basic.json" >/dev/null
 {"current_program_scene":"${SCENE_NAME}","current_scene":"${SCENE_NAME}","name":"${COLLECTION_NAME}","scene_order":[{"name":"${SCENE_NAME}"}],"sources":[]}
 COLLECTION
 
-cat <<SCENE_LIST | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/scene_collections.json" >/dev/null
+cat <<SCENE_LIST | run_as_streamer tee "$CONFIG_ROOT/basic/scene_collections.json" >/dev/null
 {
   "current_scene_collection": "${COLLECTION_NAME}",
   "scene_collections": [
@@ -167,7 +185,7 @@ cat <<SCENE_LIST | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/scene_collecti
 }
 SCENE_LIST
 
-cat <<PROFILE_LIST | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/profiles.json" >/dev/null
+cat <<PROFILE_LIST | run_as_streamer tee "$CONFIG_ROOT/basic/profiles.json" >/dev/null
 {
   "current_profile": "${COLLECTION_NAME}",
   "profiles": [
@@ -178,7 +196,7 @@ cat <<PROFILE_LIST | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/basic/profiles.jso
 }
 PROFILE_LIST
 
-cat <<GLOBAL | sudo -u "$STREAM_USER" tee "$CONFIG_ROOT/global.ini" >/dev/null
+cat <<GLOBAL | run_as_streamer tee "$CONFIG_ROOT/global.ini" >/dev/null
 [General]
 ConfigDir=$CONFIG_ROOT
 [Basic]
@@ -186,6 +204,8 @@ Profile=${COLLECTION_NAME}
 Collection=${COLLECTION_NAME}
 GLOBAL
 
-chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME/.config" "$OBS_HOME/logs" "$CACHE_ROOT"
+if [[ "$current_uid" -eq 0 ]]; then
+  chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME/.config" "$OBS_HOME/logs" "$CACHE_ROOT"
+fi
 
 echo "OBS profile '${COLLECTION_NAME}' created for user ${STREAM_USER}."
