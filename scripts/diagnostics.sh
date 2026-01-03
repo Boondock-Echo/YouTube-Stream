@@ -44,12 +44,14 @@ done
 passes=()
 warnings=()
 failures=()
+obs_log_notes=()
 ENV_STREAM_KEY=""
 SERVICE_STREAM_KEY=""
 
 log_pass() { passes+=("$1"); printf '[PASS] %s\n' "$1"; }
 log_warn() { warnings+=("$1"); printf '[WARN] %s\n' "$1"; }
 log_fail() { failures+=("$1"); printf '[FAIL] %s\n' "$1"; }
+append_obs_log_note() { obs_log_notes+=("$1"); }
 
 is_root() {
   [[ "$(id -u)" -eq 0 ]]
@@ -330,11 +332,18 @@ check_obs_logs() {
 
   local rtmp_pattern="rtmp|rtmps|connection failed|output fail"
   if grep -Ei "$rtmp_pattern" "$latest" >/dev/null 2>&1; then
-    log_warn "Latest OBS log ($latest) contains RTMP or output error entries (showing excerpts)"
-    grep -Ein "$rtmp_pattern" "$latest" | head -n 5
-    echo "--- Recent OBS log tail ---"
-    tail -n 25 "$latest"
-    echo "---------------------------"
+    log_warn "Latest OBS log ($latest) contains RTMP or output error entries (see OBS log excerpts below)"
+    local rtmp_matches log_tail
+    rtmp_matches=$(grep -Ein "$rtmp_pattern" "$latest" | head -n 5 || true)
+    log_tail=$(tail -n 25 "$latest" || true)
+    append_obs_log_note "$(cat <<EOF
+Latest OBS log ($latest) RTMP/output excerpts:
+$rtmp_matches
+--- Recent OBS log tail ---
+$log_tail
+---------------------------
+EOF
+)"
   else
     log_pass "Latest OBS log ($latest) has no RTMP/output errors detected"
   fi
@@ -347,11 +356,18 @@ warn_on_obs_crash() {
   local crash_patterns="basic_string: construction from null|std::logic_error|terminate called|core dumped"
 
   if grep -Eiq "$crash_patterns" "$log_file"; then
-    log_warn "Latest OBS log ($log_file) shows a crash signature (see excerpt below)"
-    grep -Ein "$crash_patterns" "$log_file" | head -n 5
-    echo "--- Recent OBS log tail ---"
-    tail -n 25 "$log_file"
-    echo "---------------------------"
+    log_warn "Latest OBS log ($log_file) shows a crash signature (see OBS log excerpts below)"
+    local crash_matches log_tail
+    crash_matches=$(grep -Ein "$crash_patterns" "$log_file" | head -n 5 || true)
+    log_tail=$(tail -n 25 "$log_file" || true)
+    append_obs_log_note "$(cat <<EOF
+Latest OBS log ($log_file) crash excerpts:
+$crash_matches
+--- Recent OBS log tail ---
+$log_tail
+---------------------------
+EOF
+)"
   fi
 }
 
@@ -518,6 +534,14 @@ main() {
   for msg in "${passes[@]}"; do echo "PASS: $msg"; done
   for msg in "${warnings[@]}"; do echo "WARN: $msg"; done
   for msg in "${failures[@]}"; do echo "FAIL: $msg"; done
+
+  if [[ ${#obs_log_notes[@]} -gt 0 ]]; then
+    echo
+    echo "=== OBS Log Excerpts ==="
+    for note in "${obs_log_notes[@]}"; do
+      printf "%s\n" "$note"
+    done
+  fi
 
   if [[ ${#failures[@]} -gt 0 ]]; then
     echo
