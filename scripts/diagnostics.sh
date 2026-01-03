@@ -53,6 +53,21 @@ log_warn() { warnings+=("$1"); printf '[WARN] %s\n' "$1"; }
 log_fail() { failures+=("$1"); printf '[FAIL] %s\n' "$1"; }
 append_obs_log_note() { obs_log_notes+=("$1"); }
 
+format_stream_key() {
+  local key="$1"
+  local len=${#key}
+  local escaped
+  escaped=$(printf '%q' "$key")
+
+  if [[ -z "$key" ]]; then
+    echo "<empty>"
+  elif [[ "$len" -le 6 ]]; then
+    printf "'%s' (len=%d, shell-escaped=%s)" "$key" "$len" "$escaped"
+  else
+    printf "'%s...%s' (len=%d, shell-escaped=%s)" "${key:0:3}" "${key: -3}" "$len" "$escaped"
+  fi
+}
+
 is_root() {
   [[ "$(id -u)" -eq 0 ]]
 }
@@ -256,7 +271,9 @@ compare_stream_keys() {
     if [[ "$ENV_STREAM_KEY" == "$SERVICE_STREAM_KEY" ]]; then
       log_pass "Stream key matches between $ENV_FILE and service.json"
     else
-      log_warn "Stream key in $ENV_FILE differs from service.json (rerun configure_obs.sh)"
+      local diff_note="Stream key mismatch detected:"
+      diff_note+=" ENV: $(format_stream_key "$ENV_STREAM_KEY"), OBS service.json: $(format_stream_key "$SERVICE_STREAM_KEY")"
+      log_warn "$diff_note (rerun configure_obs.sh)"
     fi
   fi
 }
