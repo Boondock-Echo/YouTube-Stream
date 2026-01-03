@@ -2,23 +2,113 @@
 set -euo pipefail
 
 # Creates an OBS Studio profile and scene collection for headless streaming of the React app.
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${SCRIPT_DIR}/config.json"
 
-STREAM_USER=${STREAM_USER:-streamer}
-OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
+# Initialize variables so `set -u` does not fail when they are unset in the environment.
+STREAM_USER=${STREAM_USER:-}
+OBS_HOME=${OBS_HOME:-}
+COLLECTION_NAME=${COLLECTION_NAME:-}
+SCENE_NAME=${SCENE_NAME:-}
+SOURCE_NAME=${SOURCE_NAME:-}
+STREAM_KEY=${YOUTUBE_STREAM_KEY:-${STREAM_KEY:-}}
+STREAM_URL=${STREAM_URL:-}
+APP_URL=${APP_URL:-}
+
+prompt_for_value() {
+  local variable_name=$1
+  local prompt_text=$2
+  local default_value=$3
+  local require_nonempty=${4:-false}
+
+  local prompt_suffix=""
+  if [[ -n "$default_value" ]]; then
+    prompt_suffix=" [${default_value}]"
+  fi
+
+  local input
+  while true; do
+    read -r -p "${prompt_text}${prompt_suffix}: " input
+    if [[ -z "$input" ]]; then
+      input=$default_value
+    fi
+
+    if [[ "$require_nonempty" == "true" && -z "$input" ]]; then
+      echo "This value is required."
+      continue
+    fi
+    break
+  done
+
+  printf -v "$variable_name" '%s' "$input"
+}
+
+load_config() {
+  eval "$(
+    python - <<'PY' "$CONFIG_FILE"
+import json, shlex, sys
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+for key in ["STREAM_USER", "OBS_HOME", "COLLECTION_NAME", "SCENE_NAME", "SOURCE_NAME", "STREAM_KEY", "STREAM_URL", "APP_URL"]:
+    value = data.get(key, "")
+    print(f"{key}={shlex.quote(str(value))}")
+PY
+  )"
+}
+
+write_config() {
+  python - <<'PY' "$CONFIG_FILE" "$STREAM_USER" "$OBS_HOME" "$COLLECTION_NAME" "$SCENE_NAME" "$SOURCE_NAME" "$STREAM_KEY" "$STREAM_URL" "$APP_URL"
+import json, sys
+path = sys.argv[1]
+keys = ["STREAM_USER", "OBS_HOME", "COLLECTION_NAME", "SCENE_NAME", "SOURCE_NAME", "STREAM_KEY", "STREAM_URL", "APP_URL"]
+values = sys.argv[2:]
+payload = dict(zip(keys, values))
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(payload, f, indent=2)
+    f.write("\n")
+PY
+}
+
+if [[ -f "$CONFIG_FILE" ]]; then
+  echo "Loading OBS configuration from ${CONFIG_FILE}."
+  load_config
+else
+  default_stream_user=${STREAM_USER:-streamer}
+  prompt_for_value STREAM_USER "Enter the service user for OBS" "$default_stream_user" true
+
+  default_obs_home=${OBS_HOME:-/var/lib/${STREAM_USER}}
+  prompt_for_value OBS_HOME "Enter the OBS home directory" "$default_obs_home" true
+
+  default_collection_name=${COLLECTION_NAME:-YouTubeHeadless}
+  prompt_for_value COLLECTION_NAME "Enter the OBS collection name" "$default_collection_name" true
+
+  default_scene_name=${SCENE_NAME:-WebScene}
+  prompt_for_value SCENE_NAME "Enter the scene name" "$default_scene_name" true
+
+  default_source_name=${SOURCE_NAME:-BrowserSource}
+  prompt_for_value SOURCE_NAME "Enter the browser source name" "$default_source_name" true
+
+  default_stream_url=${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}
+  prompt_for_value STREAM_URL "Enter the RTMP server URL" "$default_stream_url" true
+
+  default_app_url=${APP_URL:-http://localhost:3000}
+  prompt_for_value APP_URL "Enter the app URL for the browser source" "$default_app_url" true
+
+  prompt_for_value STREAM_KEY "Enter the YouTube stream key" "${STREAM_KEY:-}" true
+
+  write_config
+  echo "Saved OBS configuration to ${CONFIG_FILE}."
+fi
+
 CONFIG_ROOT="$OBS_HOME/.config/obs-studio"
 CACHE_ROOT="$OBS_HOME/.cache/obs-studio"
-COLLECTION_NAME=${COLLECTION_NAME:-YouTubeHeadless}
-SCENE_NAME=${SCENE_NAME:-WebScene}
-SOURCE_NAME=${SOURCE_NAME:-BrowserSource}
-STREAM_KEY=${YOUTUBE_STREAM_KEY:-}
-STREAM_URL=${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}
-APP_URL=${APP_URL:-http://localhost:3000}
 
 current_user=$(id -un)
 current_uid=$(id -u)
 
 if [[ -z "$STREAM_KEY" ]]; then
-  echo "Set YOUTUBE_STREAM_KEY in the environment before running this script." >&2
+  echo "Stream key is missing. Update ${CONFIG_FILE} or remove it to re-enter values." >&2
   exit 1
 fi
 
