@@ -5,6 +5,7 @@ set -euo pipefail
 
 APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
 STREAM_USER=${STREAM_USER:-streamer}
+OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 NODE_MAJOR=${NODE_MAJOR:-20}
 
 export DEBIAN_FRONTEND=${DEBIAN_FRONTEND:-noninteractive}
@@ -43,10 +44,12 @@ fi
 
 # Ensure the service user exists
 if ! id -u "$STREAM_USER" >/dev/null 2>&1; then
-  useradd --system --create-home --home-dir "/var/lib/${STREAM_USER}" --shell /bin/bash "$STREAM_USER"
+  useradd --system --create-home --home-dir "$OBS_HOME" --shell /bin/bash "$STREAM_USER"
 fi
 
-mkdir -p "$APP_DIR"
-chown -R "$STREAM_USER":"$STREAM_USER" "$APP_DIR"
+# Ensure the service account can read/write OBS and the app directory
+usermod -a -G video,audio,render "$STREAM_USER" 2>/dev/null || true
+mkdir -p "$OBS_HOME" "$OBS_HOME/.config/obs-studio" "$OBS_HOME/logs" "$APP_DIR"
+chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME" "$APP_DIR"
 
 echo "Dependencies installed. Proceed with scripts/bootstrap_react_app.sh and scripts/configure_obs.sh." 
