@@ -6,7 +6,7 @@ set -euo pipefail
 # from another host and inherited unexpected owners/groups.
 
 APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
-STREAM_USER=${STREAM_USER:-mjhughes}
+STREAM_USER=${STREAM_USER:-streamer}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 ENV_FILE=${ENV_FILE:-/etc/youtube-stream/env}
 REACT_SERVICE=react-web.service

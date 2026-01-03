@@ -4,7 +4,7 @@ set -euo pipefail
 # Installs Node.js, OBS Studio, and supporting dependencies for headless streaming.
 
 APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
-STREAM_USER=${STREAM_USER:-mjhughes}
+STREAM_USER=${STREAM_USER:-streamer}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 NODE_MAJOR=${NODE_MAJOR:-20}
 
