@@ -110,6 +110,13 @@ sudo bash scripts/diagnostics.sh \
   --check-build     # (optional) run npm run build --if-present inside the app
 ```
 
+To avoid systemd restart loops, run diagnostics **before** starting the units. For example, in a container or fresh install:
+```bash
+sudo STREAM_USER=streamer APP_DIR=/opt/youtube-stream/webapp \
+  bash scripts/diagnostics.sh --skip-systemd --skip-network --check-build
+```
+This surfaces missing stream keys, OBS profiles, or build failures without repeatedly restarting `obs-headless.service`.
+
 ### Notes
 - OBS relies on Xvfb for a virtual display; adjust resolution/FPS inside `scripts/configure_obs.sh` if desired.
 - The sample React page is a placeholder—you can modify `/opt/youtube-stream/webapp/src` and redeploy.
