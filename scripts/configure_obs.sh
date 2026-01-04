@@ -15,6 +15,7 @@ ENV_FILE="/etc/youtube-stream/env"
 # Keep base/output aligned to avoid extra OBS rescaling.
 VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1024}"
 VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-576}"
+ENABLE_BROWSER_SOURCE_HW_ACCEL="${ENABLE_BROWSER_SOURCE_HW_ACCEL:-0}"
 
 # Helper: Run as streamer user
 run_as_streamer() {
@@ -40,6 +41,27 @@ select_encoder() {
 
     echo "$encoder"
 }
+
+# Flags
+for arg in "$@"; do
+    case "$arg" in
+        --enable-browser-hw-accel)
+            ENABLE_BROWSER_SOURCE_HW_ACCEL=1
+            ;;
+        --disable-browser-hw-accel)
+            ENABLE_BROWSER_SOURCE_HW_ACCEL=0
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ "${ENABLE_BROWSER_SOURCE_HW_ACCEL}" != "0" && "${ENABLE_BROWSER_SOURCE_HW_ACCEL}" != "1" ]]; then
+    echo "Error: ENABLE_BROWSER_SOURCE_HW_ACCEL must be 0 (default) or 1." >&2
+    exit 1
+fi
 
 # Prompt or load config
 if [[ -f "${CONFIG_JSON}" ]]; then
@@ -75,6 +97,11 @@ if ! [[ "$VIDEO_BASE_WIDTH" =~ ^[0-9]+$ && "$VIDEO_BASE_HEIGHT" =~ ^[0-9]+$ ]]; 
 fi
 
 echo "Using: Scene=${SCENE_NAME}, Source=${SOURCE_NAME}, URL=${APP_URL}, Key=${YOUTUBE_STREAM_KEY:0:10}..."
+if [[ "${ENABLE_BROWSER_SOURCE_HW_ACCEL}" == "1" ]]; then
+    echo "Browser source hardware acceleration: ENABLED (requires GPU/driver support; may be less stable in headless/virtual environments)."
+else
+    echo "Browser source hardware acceleration: DISABLED (default for stability; higher CPU usage possible)."
+fi
 
 # Create dirs/ownership
 mkdir -p "${CONFIG_ROOT}/basic/scenes" "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
@@ -85,10 +112,10 @@ echo "YOUTUBE_STREAM_KEY=${YOUTUBE_STREAM_KEY}" > "${ENV_FILE}"
 chmod 640 "${ENV_FILE}"
 chown root:root "${ENV_FILE}"
 
-# Global.ini with hardware accel disable
+# Global.ini (browser source hardware acceleration configurable; defaults off)
 cat > "${GLOBAL_INI}" << GLOBAL
 [General]
-EnableBrowserSourceHardwareAcceleration=0
+EnableBrowserSourceHardwareAcceleration=${ENABLE_BROWSER_SOURCE_HW_ACCEL}
 
 [BrowserSource]
 CEFLogging=1
