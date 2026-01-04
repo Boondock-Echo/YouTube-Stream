@@ -18,6 +18,26 @@ run_as_streamer() {
     sudo -u streamer HOME=/var/lib/streamer bash -c "$1"
 }
 
+# Helper: Choose the best available hardware encoder (fallback to x264)
+select_encoder() {
+    local encoder="x264"
+
+    if command -v ffmpeg >/dev/null 2>&1; then
+        local ff_encoders
+        ff_encoders="$(ffmpeg -hide_banner -encoders 2>/dev/null || true)"
+
+        if grep -qE '(^|\s)h264_nvenc(\s|$)' <<<"$ff_encoders"; then
+            encoder="h264_nvenc"
+        elif grep -qE '(^|\s)h264_amf(\s|$)' <<<"$ff_encoders"; then
+            encoder="h264_amf"
+        elif grep -qE '(^|\s)h264_qsv(\s|$)' <<<"$ff_encoders"; then
+            encoder="obs_qsv11"
+        fi
+    fi
+
+    echo "$encoder"
+}
+
 # Prompt or load config
 if [[ -f "${CONFIG_JSON}" ]]; then
     source <(jq -r 'to_entries|map("\(.key)=\(.value)")|join("\n")' "${CONFIG_JSON}")
@@ -187,6 +207,18 @@ if ! jq . "${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json" >/dev/null; then
     exit 1
 fi
 
+# Select encoder and bitrate defaults
+ENCODER="$(select_encoder)"
+VIDEO_BITRATE="${VIDEO_BITRATE:-3500}"
+if [[ "$ENCODER" == "x264" ]]; then
+    ADV_PRESET="${ADV_PRESET:-superfast}"
+else
+    # Hardware encoders generally use vendor presets; keep to OBS default for compatibility.
+    ADV_PRESET="${ADV_PRESET:-default}"
+fi
+
+echo "OBS encoder selected: ${ENCODER} (bitrate=${VIDEO_BITRATE}kbps, preset=${ADV_PRESET})"
+
 # Profile basic.ini with YouTube opts
 cat > "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/basic.ini" << PROFILE
 [General]
@@ -198,7 +230,7 @@ Channels=2
 
 [Output]
 Mode=Advanced
-Encoder=x264
+Encoder=${ENCODER}
 RescaleOutput=0
 ColorFormat=NV12
 ColorSpace=709
@@ -206,13 +238,14 @@ ColorRange=Partial
 ApplyBitrate=1
 
 [SimpleOutput]
-VBitrate=2500
+VBitrate=${VIDEO_BITRATE}
 ABitrate=128
 
 [AdvOut]
-Encoder=x264
+Encoder=${ENCODER}
+Bitrate=${VIDEO_BITRATE}
 KeyframeIntervalSeconds=2
-Preset=veryfast
+Preset=${ADV_PRESET}
 Profile=high
 Tune=zerolatency
 PsychoVisualTuning=0
