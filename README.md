@@ -54,6 +54,10 @@ sudo systemctl restart obs-headless.service
   - `STREAM_USER` (default `streamer`)
   - `OBS_HOME` (default `/var/lib/<STREAM_USER>`, `/var/lib/streamer` by default)
   - `APP_URL` (default `http://localhost:3000` in `configure_obs.sh`)
+- Browser source hardware acceleration:
+  - Default **disabled** for stability in headless/virtualized environments where GPU drivers or OpenGL support may be limited.
+  - Enable if you have a stable GPU/driver stack and want lower CPU usage: `ENABLE_BROWSER_SOURCE_HW_ACCEL=1 bash scripts/configure_obs.sh` or add `--enable-browser-hw-accel`.
+  - Explicitly disable (default): `ENABLE_BROWSER_SOURCE_HW_ACCEL=0 bash scripts/configure_obs.sh` or add `--disable-browser-hw-accel`.
 - The systemd services restart on failure and at boot to maintain 24/7 uptime.
 
 ### Ownership and permissions
