@@ -1,160 +1,76 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-# Creates an OBS Studio profile and scene collection for headless streaming of the React app.
-SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${SCRIPT_DIR}/config.json"
+# Configure OBS for Headless YouTube Streaming
+# Run as root. Generates scenes, profiles, services with fixes.
 
-# Initialize variables so `set -u` does not fail when they are unset in the environment.
-STREAM_USER=${STREAM_USER:-}
-OBS_HOME=${OBS_HOME:-}
-COLLECTION_NAME=${COLLECTION_NAME:-}
-SCENE_NAME=${SCENE_NAME:-}
-SOURCE_NAME=${SOURCE_NAME:-}
-STREAM_KEY=${YOUTUBE_STREAM_KEY:-${STREAM_KEY:-}}
-STREAM_URL=${STREAM_URL:-}
-APP_URL=${APP_URL:-}
+set -e
 
-if command -v python3 >/dev/null 2>&1; then
-  PYTHON_BIN=python3
-elif command -v python >/dev/null 2>&1; then
-  PYTHON_BIN=python
-else
-  echo "Python is required to run this script. Please install Python 3." >&2
-  exit 1
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_JSON="${SCRIPT_DIR}/config.json"
+COLLECTION_NAME="YouTubeHeadless"
+CONFIG_ROOT="/var/lib/streamer/.config/obs-studio"
+GLOBAL_INI="${CONFIG_ROOT}/global.ini"
+APP_DIR="/opt/youtube-stream/webapp"
+ENV_FILE="/etc/youtube-stream/env"
 
-prompt_for_value() {
-  local variable_name=$1
-  local prompt_text=$2
-  local default_value=$3
-  local require_nonempty=${4:-false}
-
-  local prompt_suffix=""
-  if [[ -n "$default_value" ]]; then
-    prompt_suffix=" [${default_value}]"
-  fi
-
-  local input
-  while true; do
-    read -r -p "${prompt_text}${prompt_suffix}: " input
-    if [[ -z "$input" ]]; then
-      input=$default_value
-    fi
-
-    if [[ "$require_nonempty" == "true" && -z "$input" ]]; then
-      echo "This value is required."
-      continue
-    fi
-    break
-  done
-
-  printf -v "$variable_name" '%s' "$input"
-}
-
-load_config() {
-  eval "$(
-    "$PYTHON_BIN" - <<'PY' "$CONFIG_FILE"
-import json, shlex, sys
-path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as f:
-    data = json.load(f)
-for key in ["STREAM_USER", "OBS_HOME", "COLLECTION_NAME", "SCENE_NAME", "SOURCE_NAME", "STREAM_KEY", "STREAM_URL", "APP_URL"]:
-    value = data.get(key, "")
-    print(f"{key}={shlex.quote(str(value))}")
-PY
-  )"
-}
-
-write_config() {
-  "$PYTHON_BIN" - <<'PY' "$CONFIG_FILE" "$STREAM_USER" "$OBS_HOME" "$COLLECTION_NAME" "$SCENE_NAME" "$SOURCE_NAME" "$STREAM_KEY" "$STREAM_URL" "$APP_URL"
-import json, sys
-path = sys.argv[1]
-keys = ["STREAM_USER", "OBS_HOME", "COLLECTION_NAME", "SCENE_NAME", "SOURCE_NAME", "STREAM_KEY", "STREAM_URL", "APP_URL"]
-values = sys.argv[2:]
-payload = dict(zip(keys, values))
-with open(path, "w", encoding="utf-8") as f:
-    json.dump(payload, f, indent=2)
-    f.write("\n")
-PY
-}
-
-if [[ -f "$CONFIG_FILE" ]]; then
-  echo "Loading OBS configuration from ${CONFIG_FILE}."
-  load_config
-else
-  default_stream_user=${STREAM_USER:-streamer}
-  prompt_for_value STREAM_USER "Enter the service user for OBS" "$default_stream_user" true
-
-  default_obs_home=${OBS_HOME:-/var/lib/${STREAM_USER}}
-  prompt_for_value OBS_HOME "Enter the OBS home directory" "$default_obs_home" true
-
-  default_collection_name=${COLLECTION_NAME:-YouTubeHeadless}
-  prompt_for_value COLLECTION_NAME "Enter the OBS collection name" "$default_collection_name" true
-
-  default_scene_name=${SCENE_NAME:-WebScene}
-  prompt_for_value SCENE_NAME "Enter the scene name" "$default_scene_name" true
-
-  default_source_name=${SOURCE_NAME:-BrowserSource}
-  prompt_for_value SOURCE_NAME "Enter the browser source name" "$default_source_name" true
-
-  default_stream_url=${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}
-  prompt_for_value STREAM_URL "Enter the RTMP server URL" "$default_stream_url" true
-
-  default_app_url=${APP_URL:-http://localhost:3000}
-  prompt_for_value APP_URL "Enter the app URL for the browser source" "$default_app_url" true
-
-  prompt_for_value STREAM_KEY "Enter the YouTube stream key" "${STREAM_KEY:-}" true
-
-  write_config
-  echo "Saved OBS configuration to ${CONFIG_FILE}."
-fi
-
-CONFIG_ROOT="$OBS_HOME/.config/obs-studio"
-CACHE_ROOT="$OBS_HOME/.cache/obs-studio"
-
-current_user=$(id -un)
-current_uid=$(id -u)
-
-if [[ -z "$STREAM_KEY" ]]; then
-  echo "Stream key is missing. Update ${CONFIG_FILE} or remove it to re-enter values." >&2
-  exit 1
-fi
-
-if [[ "$current_user" != "$STREAM_USER" && "$current_uid" -ne 0 ]]; then
-  echo "Run this script as root or ${STREAM_USER} so it can prepare the OBS profile." >&2
-  exit 1
-fi
-
-# Ensure the service user exists and has a home directory. Without this, OBS will
-# segfault on startup when it cannot resolve config paths (manifesting as
-# `basic_string: construction from null is not valid`).
-if ! id -u "$STREAM_USER" >/dev/null 2>&1; then
-  if [[ "$current_uid" -eq 0 ]]; then
-    useradd --system --create-home --home-dir "$OBS_HOME" --shell /bin/bash "$STREAM_USER"
-  else
-    echo "Service user ${STREAM_USER} is missing. Run this script as root or run install_dependencies.sh first." >&2
-    exit 1
-  fi
-fi
-
+# Helper: Run as streamer user
 run_as_streamer() {
-  if [[ "$current_user" == "$STREAM_USER" ]]; then
-    "$@"
-  else
-    sudo -u "$STREAM_USER" "$@"
-  fi
+    sudo -u streamer HOME=/var/lib/streamer bash -c "$1"
 }
 
-mkdir -p "$OBS_HOME"
-if [[ "$current_uid" -eq 0 ]]; then
-  chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME"
+# Prompt or load config
+if [[ -f "${CONFIG_JSON}" ]]; then
+    source <(jq -r 'to_entries|map("\(.key)=\(.value)")|join("\n")' "${CONFIG_JSON}")
+else
+    echo "=== Configuration Prompts ==="
+    read -p "Scene name [WebScene]: " SCENE_NAME
+    SCENE_NAME=${SCENE_NAME:-WebScene}
+    read -p "Source name [BrowserSource]: " SOURCE_NAME
+    SOURCE_NAME=${SOURCE_NAME:-BrowserSource}
+    read -p "App URL [http://localhost:3000]: " APP_URL
+    APP_URL=${APP_URL:-http://localhost:3000}
+    read -p "YouTube Stream Key: " YOUTUBE_STREAM_KEY
+
+    # Save config
+    jq -n \
+        --arg scene "$SCENE_NAME" \
+        --arg source "$SOURCE_NAME" \
+        --arg url "$APP_URL" \
+        --arg key "$YOUTUBE_STREAM_KEY" \
+        '{scene: $scene, source: $source, url: $url, key: $key}' \
+        > "${CONFIG_JSON}"
 fi
 
-run_as_streamer mkdir -p "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}" "$CONFIG_ROOT/basic/scenes" "$OBS_HOME/logs" "$CACHE_ROOT"
+# Validate inputs
+if [[ -z "$YOUTUBE_STREAM_KEY" ]]; then
+    echo "Error: Stream key required." >&2
+    exit 1
+fi
 
-# Scene collection with a single browser source pointing to the React app
-cat <<SCENE | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.json" >/dev/null
+echo "Using: Scene=${SCENE_NAME}, Source=${SOURCE_NAME}, URL=${APP_URL}, Key=${YOUTUBE_STREAM_KEY:0:10}..."
+
+# Create dirs/ownership
+mkdir -p "${CONFIG_ROOT}/basic/scenes" "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
+chown -R streamer:streamer /var/lib/streamer/.config
+chmod 755 /var/lib/streamer
+# Env file
+echo "YOUTUBE_STREAM_KEY=${YOUTUBE_STREAM_KEY}" > "${ENV_FILE}"
+chmod 640 "${ENV_FILE}"
+chown root:root "${ENV_FILE}"
+
+# Global.ini with hardware accel disable
+cat > "${GLOBAL_INI}" << GLOBAL
+[General]
+EnableBrowserSourceHardwareAcceleration=0
+
+[BrowserSource]
+CEFLogging=1
+GLOBAL
+run_as_streamer "touch '${GLOBAL_INI}'"  # Ensures ownership
+chown streamer:streamer "${GLOBAL_INI}"
+
+# Fixed scene JSON (hierarchical, with silent audio)
+cat << SCENE | run_as_streamer tee "${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json" >/dev/null
 {
   "current_program": "${SCENE_NAME}",
   "current_preview": "${SCENE_NAME}",
@@ -163,9 +79,7 @@ cat <<SCENE | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.
   "modules": {},
   "preview_locked": false,
   "quick_transitions": [],
-  "scene_order": [
-    "${SCENE_NAME}"
-  ],
+  "scene_order": ["${SCENE_NAME}"],
   "sources": {
     "${SOURCE_NAME}": {
       "balance": 0,
@@ -186,6 +100,7 @@ cat <<SCENE | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.
         "is_local_file": false,
         "local_file": "",
         "reroute_audio": false,
+        "refresh": true,
         "shutdown_source": true,
         "url": "${APP_URL}",
         "width": 1280
@@ -223,6 +138,28 @@ cat <<SCENE | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.
           "sync": 0,
           "type": "browser_source",
           "volume": 1
+        },
+        {
+          "balance": 0,
+          "deinterlace_field_order": 0,
+          "deinterlace_mode": 0,
+          "enabled": true,
+          "flags": 264,
+          "hotkeys": {},
+          "id": "SilenceAudio",
+          "mixers": 0,
+          "muted": false,
+          "name": "Silence",
+          "settings": {
+            "is_looping": true,
+            "path": "",
+            "restart_on_activate": false,
+            "sync": 0,
+            "sync_offset": 0
+          },
+          "sync": 0,
+          "type": "vlc_source",
+          "volume": 0
         }
       ],
       "sync": 0,
@@ -239,106 +176,127 @@ cat <<SCENE | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.
       "id": "fade_transition"
     }
   },
-  "uids": [
-    "${SCENE_NAME}",
-    "${SOURCE_NAME}"
-  ],
+  "uids": ["${SCENE_NAME}", "${SOURCE_NAME}", "SilenceAudio"],
   "version": 1
 }
 SCENE
 
-# Streaming profile pointing at YouTube RTMP with the supplied stream key
-cat <<PROFILE | run_as_streamer tee "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}/basic.ini" >/dev/null
+# Validate JSON
+if ! jq . "${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json" >/dev/null; then
+    echo "Error: Invalid JSON generated." >&2
+    exit 1
+fi
+
+# Profile basic.ini with YouTube opts
+cat > "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/basic.ini" << PROFILE
 [General]
 Name=${COLLECTION_NAME}
 
-[Video]
-BaseCX=1280
-BaseCY=720
-OutputCX=1280
-OutputCY=720
-FPSType=0
-FPSCommon=30
+[Audio]
+SampleRate=48000
+Channels=2
 
 [Output]
 Mode=Advanced
-RecEncoder=obs_x264
-Track1Bitrate=160
+Encoder=x264
+RescaleOutput=0
+ColorFormat=NV12
+ColorSpace=709
+ColorRange=Partial
+ApplyBitrate=1
+
+[SimpleOutput]
+VBitrate=2500
+ABitrate=128
 
 [AdvOut]
-Encoder=obs_x264
-Bitrate=4500
-KeyIntSec=2
+Encoder=x264
+KeyframeIntervalSeconds=2
 Preset=veryfast
-RateControl=CBR
-PROFILE
+Profile=high
+Tune=zerolatency
+PsychoVisualTuning=0
+Lookahead=0
+Bframes=0
 
-cat <<SERVICE | run_as_streamer tee "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}/service.json" >/dev/null
-{
-  "settings": {
-    "key": "${STREAM_KEY}",
-    "server": "${STREAM_URL}"
-  },
-  "type": "rtmp_common"
-}
+[Service]
+Projector=rtmp://a.rtmp.youtube.com/live2
+Key=${YOUTUBE_STREAM_KEY}
+PROFILE
+chown -R streamer:streamer "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
+
+# Registries
+cat << REGISTRY | run_as_streamer tee "${CONFIG_ROOT}/basic/scene_collections.json" >/dev/null
+{"current": "${COLLECTION_NAME}", "${COLLECTION_NAME}": {"_id": "${COLLECTION_NAME}"}}
+REGISTRY
+
+cat << REGISTRY | run_as_streamer tee "${CONFIG_ROOT}/basic/profiles.json" >/dev/null
+{"current": "${COLLECTION_NAME}", "${COLLECTION_NAME}": {"_id": "${COLLECTION_NAME}"}}
+REGISTRY
+
+# Services (with fixes)
+cat > /etc/systemd/system/react-web.service << SERVICE
+[Unit]
+Description=React Web App
+After=network.target
+
+[Service]
+Type=simple
+User=streamer
+WorkingDirectory=${APP_DIR}
+Environment=HOST=0.0.0.0
+Environment=PORT=3000
+ExecStart=/usr/bin/npx --yes serve -s build -l 3000 --listen tcp://0.0.0.0:3000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
 SERVICE
 
-cat <<COLLECTION | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/Basic.json" >/dev/null
-{
-  "current_program": "${SCENE_NAME}",
-  "current_preview": "${SCENE_NAME}",
-  "current_transition": "Default",
-  "groups": {},
-  "modules": {},
-  "preview_locked": false,
-  "quick_transitions": [],
-  "scene_order": ["${SCENE_NAME}"],
-  "sources": {},
-  "sources_version": 2,
-  "transition_duration": 300,
-  "transitions": {
-    "Default": {
-      "duration": 300,
-      "id": "fade_transition"
-    }
+cat > /etc/systemd/system/obs-headless.service << SERVICE
+[Unit]
+Description=OBS headless YouTube streaming
+After=network.target react-web.service
+Requires=react-web.service
+
+[Service]
+Type=simple
+User=streamer
+Group=streamer
+Environment=HOME=/var/lib/streamer
+Environment=DISPLAY=:99
+Environment=CEF_DISABLE_SANDBOX=1
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 1280x720x24 +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --startstreaming
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+systemctl daemon-reload
+systemctl enable react-web.service obs-headless.service
+
+echo "Configuration complete! Run 'systemctl start react-web obs-headless' to stream."
+echo "Verify: ./diagnostics.sh"{
+  "led": {
+    "gpio": 12,
+    "enabled": true,
+    "mode": "anode"
   },
-  "uids": [],
-  "version": 1
-}
-COLLECTION
-
-cat <<SCENE_LIST | run_as_streamer tee "$CONFIG_ROOT/basic/scene_collections.json" >/dev/null
-{
-  "current_scene_collection": "${COLLECTION_NAME}",
-  "scene_collections": [
-    {
-      "name": "${COLLECTION_NAME}"
+  "relays": {
+    "channel1": {
+      "gpio": 19,
+      "state": false,
+      "normal_state": "on",
+      "mode": "anode"
+    },
+    "channel2": {
+      "gpio": 21,
+      "state": false,
+      "normal_state": "on",
+      "mode": "anode"
     }
-  ]
+  }
 }
-SCENE_LIST
-
-cat <<PROFILE_LIST | run_as_streamer tee "$CONFIG_ROOT/basic/profiles.json" >/dev/null
-{
-  "current_profile": "${COLLECTION_NAME}",
-  "profiles": [
-    {
-      "name": "${COLLECTION_NAME}"
-    }
-  ]
-}
-PROFILE_LIST
-
-cat <<GLOBAL | run_as_streamer tee "$CONFIG_ROOT/global.ini" >/dev/null
-[General]
-ConfigDir=$CONFIG_ROOT
-[Basic]
-Profile=${COLLECTION_NAME}
-Collection=${COLLECTION_NAME}
-GLOBAL
-
-if [[ "$current_uid" -eq 0 ]]; then
-  chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME/.config" "$OBS_HOME/logs" "$CACHE_ROOT"
-fi
-
-echo "OBS profile '${COLLECTION_NAME}' created for user ${STREAM_USER}."
