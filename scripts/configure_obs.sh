@@ -12,6 +12,7 @@ CONFIG_ROOT="/var/lib/streamer/.config/obs-studio"
 GLOBAL_INI="${CONFIG_ROOT}/global.ini"
 APP_DIR="/opt/youtube-stream/webapp"
 ENV_FILE="/etc/youtube-stream/env"
+ENV_DIR="$(dirname "${ENV_FILE}")"
 # Keep base/output aligned to avoid extra OBS rescaling.
 VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1024}"
 VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-576}"
@@ -40,6 +41,22 @@ select_encoder() {
     fi
 
     echo "$encoder"
+}
+
+encoder_available() {
+    local encoder="$1" pattern=""
+    case "$encoder" in
+        h264_nvenc) pattern="nvenc" ;;
+        h264_amf) pattern="amf" ;;
+        obs_qsv11|h264_qsv) pattern="qsv" ;;
+        *) return 0 ;;
+    esac
+
+    if find /usr/lib* -maxdepth 3 -type f -iname "*${pattern}*.so" 2>/dev/null | grep -q .; then
+        return 0
+    fi
+
+    return 1
 }
 
 # Flags
@@ -104,6 +121,9 @@ else
 fi
 
 # Create dirs/ownership
+mkdir -p "${ENV_DIR}"
+chmod 750 "${ENV_DIR}"
+chown root:root "${ENV_DIR}"
 mkdir -p "${CONFIG_ROOT}/basic/scenes" "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
 chown -R streamer:streamer /var/lib/streamer/.config
 chmod 755 /var/lib/streamer
@@ -280,6 +300,11 @@ if [[ "$ENCODER" == "x264" ]]; then
 else
     # Hardware encoders generally use vendor presets; keep to OBS default for compatibility.
     ADV_PRESET="${ADV_PRESET:-default}"
+    if ! encoder_available "${ENCODER}"; then
+        echo "OBS encoder ${ENCODER} not detected in available plugins; falling back to x264." >&2
+        ENCODER="x264"
+        ADV_PRESET="${ADV_PRESET:-superfast}"
+    fi
 fi
 
 echo "OBS encoder selected: ${ENCODER} (video=${VIDEO_BITRATE}kbps, audio=${AUDIO_BITRATE}kbps, preset=${ADV_PRESET})"
@@ -333,11 +358,25 @@ chown -R streamer:streamer "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
 
 # Registries
 cat << REGISTRY | run_as_streamer tee "${CONFIG_ROOT}/basic/scene_collections.json" >/dev/null
-{"current": "${COLLECTION_NAME}", "${COLLECTION_NAME}": {"_id": "${COLLECTION_NAME}"}}
+{
+  "current_scene_collection": "${COLLECTION_NAME}",
+  "scene_collections": [
+    {
+      "name": "${COLLECTION_NAME}"
+    }
+  ]
+}
 REGISTRY
 
 cat << REGISTRY | run_as_streamer tee "${CONFIG_ROOT}/basic/profiles.json" >/dev/null
-{"current": "${COLLECTION_NAME}", "${COLLECTION_NAME}": {"_id": "${COLLECTION_NAME}"}}
+{
+  "current_profile": "${COLLECTION_NAME}",
+  "profiles": [
+    {
+      "name": "${COLLECTION_NAME}"
+    }
+  ]
+}
 REGISTRY
 
 # Services (with fixes)
@@ -373,7 +412,7 @@ Group=streamer
 Environment=HOME=/var/lib/streamer
 Environment=DISPLAY=:99
 Environment=CEF_DISABLE_SANDBOX=1
-ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x16 +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --startstreaming
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x16 +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --scene ${SCENE_NAME} --startstreaming
 Restart=always
 RestartSec=5
 
@@ -385,24 +424,4 @@ systemctl daemon-reload
 systemctl enable react-web.service obs-headless.service
 
 echo "Configuration complete! Run 'systemctl start react-web obs-headless' to stream."
-echo "Verify: ./diagnostics.sh"{
-  "led": {
-    "gpio": 12,
-    "enabled": true,
-    "mode": "anode"
-  },
-  "relays": {
-    "channel1": {
-      "gpio": 19,
-      "state": false,
-      "normal_state": "on",
-      "mode": "anode"
-    },
-    "channel2": {
-      "gpio": 21,
-      "state": false,
-      "normal_state": "on",
-      "mode": "anode"
-    }
-  }
-}
+echo "Verify: ./diagnostics.sh"
