@@ -12,6 +12,9 @@ CONFIG_ROOT="/var/lib/streamer/.config/obs-studio"
 GLOBAL_INI="${CONFIG_ROOT}/global.ini"
 APP_DIR="/opt/youtube-stream/webapp"
 ENV_FILE="/etc/youtube-stream/env"
+# Keep base/output aligned to avoid extra OBS rescaling.
+VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1280}"
+VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-720}"
 
 # Helper: Run as streamer user
 run_as_streamer() {
@@ -66,6 +69,10 @@ if [[ -z "$YOUTUBE_STREAM_KEY" ]]; then
     echo "Error: Stream key required." >&2
     exit 1
 fi
+if ! [[ "$VIDEO_BASE_WIDTH" =~ ^[0-9]+$ && "$VIDEO_BASE_HEIGHT" =~ ^[0-9]+$ ]]; then
+    echo "Error: VIDEO_BASE_WIDTH/VIDEO_BASE_HEIGHT must be integers." >&2
+    exit 1
+fi
 
 echo "Using: Scene=${SCENE_NAME}, Source=${SOURCE_NAME}, URL=${APP_URL}, Key=${YOUTUBE_STREAM_KEY:0:10}..."
 
@@ -116,14 +123,14 @@ cat << SCENE | run_as_streamer tee "${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAM
         "color": 1,
         "custom_css": "",
         "fps": 30,
-        "height": 720,
+        "height": ${VIDEO_BASE_HEIGHT},
         "is_local_file": false,
         "local_file": "",
         "reroute_audio": false,
         "refresh": true,
         "shutdown_source": true,
         "url": "${APP_URL}",
-        "width": 1280
+        "width": ${VIDEO_BASE_WIDTH}
       },
       "sync": 0,
       "type": "browser_source",
@@ -218,6 +225,7 @@ else
 fi
 
 echo "OBS encoder selected: ${ENCODER} (bitrate=${VIDEO_BITRATE}kbps, preset=${ADV_PRESET})"
+echo "Video base/output resolution locked to ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT} (RescaleOutput=0) to avoid extra scaling."
 
 # Profile basic.ini with YouTube opts
 cat > "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/basic.ini" << PROFILE
@@ -227,6 +235,12 @@ Name=${COLLECTION_NAME}
 [Audio]
 SampleRate=48000
 Channels=2
+
+[Video]
+BaseCX=${VIDEO_BASE_WIDTH}
+BaseCY=${VIDEO_BASE_HEIGHT}
+OutputCX=${VIDEO_BASE_WIDTH}
+OutputCY=${VIDEO_BASE_HEIGHT}
 
 [Output]
 Mode=Advanced
@@ -300,7 +314,7 @@ Group=streamer
 Environment=HOME=/var/lib/streamer
 Environment=DISPLAY=:99
 Environment=CEF_DISABLE_SANDBOX=1
-ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 1280x720x24 +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --startstreaming
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x24 +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --startstreaming
 Restart=always
 RestartSec=5
 
