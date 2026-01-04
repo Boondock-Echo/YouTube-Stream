@@ -17,6 +17,7 @@ ENV_DIR="$(dirname "${ENV_FILE}")"
 VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1024}"
 VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-576}"
 ENABLE_BROWSER_SOURCE_HW_ACCEL="${ENABLE_BROWSER_SOURCE_HW_ACCEL:-0}"
+LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
 
 # Helper: Run as streamer user
 run_as_streamer() {
@@ -412,7 +413,8 @@ Group=streamer
 Environment=HOME=/var/lib/streamer
 Environment=DISPLAY=:99
 Environment=CEF_DISABLE_SANDBOX=1
-ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x16 +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --scene ${SCENE_NAME} --startstreaming
+Environment=LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x24 -ac +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --scene ${SCENE_NAME} --startstreaming
 Restart=always
 RestartSec=5
 
