@@ -381,6 +381,8 @@ EOF
   fi
 
   warn_on_obs_crash "$latest"
+  warn_on_missing_encoders "$latest"
+  warn_on_swapchain_failure "$latest"
 }
 
 warn_on_obs_crash() {
@@ -397,6 +399,42 @@ Latest OBS log ($log_file) crash excerpts:
 $crash_matches
 --- Recent OBS log tail ---
 $log_tail
+---------------------------
+EOF
+)"
+  fi
+}
+
+warn_on_missing_encoders() {
+  local log_file="$1"
+  local missing_encoders
+  missing_encoders=$(grep -Ein "Encoder ID '[^']+' not found" "$log_file" | head -n 5 || true)
+
+  if [[ -n "$missing_encoders" ]]; then
+    log_warn "Latest OBS log ($log_file) reports missing encoders (for example NVENC) — rerun configure_obs.sh to reset to x264 or install the matching GPU driver."
+    append_obs_log_note "$(cat <<EOF
+Latest OBS log ($log_file) encoder availability excerpts:
+$missing_encoders
+--- Recent OBS log tail ---
+$(tail -n 25 "$log_file" || true)
+---------------------------
+EOF
+)"
+  fi
+}
+
+warn_on_swapchain_failure() {
+  local log_file="$1"
+  local swapchain_hits
+  swapchain_hits=$(grep -Ein "Swapchain window creation failed|gl_platform_init_swapchain|obs_display_init: Failed to create swap chain" "$log_file" | head -n 5 || true)
+
+  if [[ -n "$swapchain_hits" ]]; then
+    log_warn "Latest OBS log ($log_file) shows swapchain/GL init failures — ensure obs runs under xvfb-run with GLX and depth 24, and set LIBGL_ALWAYS_SOFTWARE=1."
+    append_obs_log_note "$(cat <<EOF
+Latest OBS log ($log_file) swapchain/GL excerpts:
+$swapchain_hits
+--- Recent OBS log tail ---
+$(tail -n 25 "$log_file" || true)
 ---------------------------
 EOF
 )"

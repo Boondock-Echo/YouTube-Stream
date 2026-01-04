@@ -55,6 +55,7 @@ sudo systemctl restart obs-headless.service
   - `OBS_HOME` (default `/var/lib/<STREAM_USER>`, `/var/lib/streamer` by default)
   - `APP_URL` (default `http://localhost:3000` in `configure_obs.sh`)
   - `VIDEO_BITRATE` and `AUDIO_BITRATE` (defaults `2500`/`128` kbps) for lighter baseline output. `configure_obs.sh` warns if your values fall outside YouTube’s guidance for the chosen resolution and checks that audio meets the recommended minimum.
+  - Force software OpenGL when headless/virtualized GPUs are unstable: `LIBGL_ALWAYS_SOFTWARE=1` (default) keeps OBS on software rendering to avoid swapchain failures.
 - Browser source hardware acceleration:
   - Default **disabled** for stability in headless/virtualized environments where GPU drivers or OpenGL support may be limited.
   - Enable if you have a stable GPU/driver stack and want lower CPU usage: `ENABLE_BROWSER_SOURCE_HW_ACCEL=1 bash scripts/configure_obs.sh` or add `--enable-browser-hw-accel`.
@@ -109,6 +110,10 @@ sudo bash scripts/diagnostics.sh \
   --skip-network    # (optional) skip HTTP probe to APP_URL
   --check-build     # (optional) run npm run build --if-present inside the app
 ```
+
+Common OBS log signatures and fixes:
+- `Encoder ID 'h264_nvenc' not found`: the profile is pointing at a hardware encoder that OBS cannot load. Rerun `scripts/configure_obs.sh` to regenerate the profile so it falls back to x264, or install a working NVIDIA driver/OBS build that exposes NVENC.
+- `Swapchain window creation failed` / `gl_platform_init_swapchain failed`: OBS could not initialize GL in the virtual display. Ensure you launch via `xvfb-run` with a 24-bit screen depth (the scripts already use `-screen 0 1024x576x24 +extension GLX +render -noreset`) and keep `LIBGL_ALWAYS_SOFTWARE=1` to force software rendering when GPU/driver support is limited.
 
 To avoid systemd restart loops, run diagnostics **before** starting the units. For example, in a container or fresh install:
 ```bash
