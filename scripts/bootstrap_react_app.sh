@@ -33,13 +33,26 @@ import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <p>Headless YouTube Stream POC</p>
-        <p>React app is live on port 3000.</p>
-        <p>OBS will capture this page for streaming.</p>
-      </header>
-    </div>
+    <main className="App">
+      <section className="Card">
+        <p className="Eyebrow">Headless YouTube Stream</p>
+        <h1>Stable preview for OBS</h1>
+        <p className="Lead">
+          This page is intentionally lightweight so Xvfb and OBS can capture it with minimal CPU/GPU load.
+          There are no animations, timers, or background polling.
+        </p>
+        <ul className="Tips">
+          <li>Use static text and images instead of video loops or canvas effects.</li>
+          <li>Keep CSS simple (no heavy shadows, blurs, or gradients).</li>
+          <li>Avoid setInterval/setTimeout polling; push updates only when the data changes.</li>
+          <li>Disable auto-playing media and large fonts pulled from remote CDNs.</li>
+          <li>Prefer CSS over JavaScript-driven layout to reduce reflows.</li>
+        </ul>
+        <p className="Footnote">
+          Need dynamic data? Throttle refreshes (e.g., once every few minutes) and cache responses.
+        </p>
+      </section>
+    </main>
   );
 }
 
@@ -47,25 +60,90 @@ export default App;
 APP
 
 cat <<'CSS' | sudo -u "$STREAM_USER" tee "$APP_DIR/src/App.css" >/dev/null
-.App {
-  text-align: center;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #0f172a, #111827);
+:root {
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #0b1224;
   color: #e5e7eb;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
 }
 
-.App-header {
+.App {
+  min-height: 100vh;
   display: grid;
-  gap: 0.5rem;
-  font-size: 1.25rem;
+  place-items: center;
+  padding: 1.5rem;
 }
 
-.App a {
-  color: #38bdf8;
+.Card {
+  width: min(720px, 100%);
+  background: #0f172a;
+  border: 1px solid #1f2937;
+  border-radius: 16px;
+  padding: 1.75rem;
+  display: grid;
+  gap: 0.75rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.Eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  color: #e5e7eb;
+}
+
+.Lead {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 1rem;
+}
+
+.Tips {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.Tips li {
+  color: #d1d5db;
+}
+
+.Footnote {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.95rem;
+  border-top: 1px solid #1f2937;
+  padding-top: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+  }
 }
 CSS
 
