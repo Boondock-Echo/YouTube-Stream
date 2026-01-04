@@ -7,6 +7,7 @@ STREAM_USER=${STREAM_USER:-streamer}
 APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 ENV_FILE=${ENV_FILE:-/etc/youtube-stream/env}
+COLLECTION_NAME=${COLLECTION_NAME:-YouTubeHeadless}
 REACT_SERVICE=react-web.service
 OBS_SERVICE=obs-headless.service
 
@@ -19,6 +20,41 @@ if [ ! -f "$APP_DIR/package.json" ]; then
   echo "React app not found at $APP_DIR. Run scripts/bootstrap_react_app.sh first." >&2
   exit 1
 fi
+
+normalize_stream_key() {
+  local key="${1%$'\r'}"
+  key="${key#"${key%%[![:space:]]*}"}"
+  key="${key%"${key##*[![:space:]]}"}"
+
+  if [[ ${#key} -ge 2 ]]; then
+    local first=${key:0:1}
+    local last=${key: -1}
+    if [[ ( "$first" == '"' && "$last" == '"' ) || ( "$first" == "'" && "$last" == "'" ) ]]; then
+      key="${key:1:-1}"
+    fi
+  fi
+
+  printf '%s' "$key"
+}
+
+preflight_misconfig_warnings() {
+  local raw_key normalized_key service_file
+  service_file="$OBS_HOME/.config/obs-studio/basic/profiles/${COLLECTION_NAME}/service.json"
+
+  if [[ -r "$ENV_FILE" ]]; then
+    raw_key=$(grep -E "^YOUTUBE_STREAM_KEY=" "$ENV_FILE" | head -n1 | cut -d'=' -f2-)
+    normalized_key=$(normalize_stream_key "$raw_key")
+    if [[ -z "$normalized_key" ]]; then
+      echo "WARNING: YOUTUBE_STREAM_KEY is empty in ${ENV_FILE}; obs-headless.service will restart until a key is provided."
+    fi
+  else
+    echo "WARNING: Env file ${ENV_FILE} is missing or unreadable; obs-headless.service will restart until it exists."
+  fi
+
+  if [[ ! -f "$service_file" ]]; then
+    echo "WARNING: OBS profile for ${COLLECTION_NAME} not found at ${service_file}. Run scripts/configure_obs.sh before starting obs-headless.service."
+  fi
+}
 
 # Build the React app so the production bundle is available for the service.
 echo "Installing dependencies and building React app at ${APP_DIR}..."
@@ -88,6 +124,8 @@ chown root:root "/etc/systemd/system/${OBS_SERVICE}"
 
 systemctl daemon-reload
 systemctl enable "${REACT_SERVICE}" "${OBS_SERVICE}"
+
+preflight_misconfig_warnings
 
 cat <<NEXT
 Services created. To start immediately:
