@@ -156,80 +156,94 @@ run_as_streamer mkdir -p "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}" "$CONF
 # Scene collection with a single browser source pointing to the React app
 cat <<SCENE | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.json" >/dev/null
 {
-  "current_program_scene": "${SCENE_NAME}",
-  "current_scene": "${SCENE_NAME}",
-  "name": "${COLLECTION_NAME}",
+  "current_program": "${SCENE_NAME}",
+  "current_preview": "${SCENE_NAME}",
+  "current_transition": "Default",
+  "groups": {},
+  "modules": {},
+  "preview_locked": false,
+  "quick_transitions": [],
   "scene_order": [
-    {"name": "${SCENE_NAME}"}
+    "${SCENE_NAME}"
   ],
-  "sources": [
-    {
-      "alignment": 5,
-      "cx": 1280,
-      "cy": 720,
-      "id": 1,
-      "locked": false,
+  "sources": {
+    "${SOURCE_NAME}": {
+      "balance": 0,
+      "deinterlace_field_order": 0,
+      "deinterlace_mode": 0,
+      "enabled": true,
+      "flags": 0,
+      "hotkeys": {},
+      "id": "browser_source",
+      "mixers": 0,
       "muted": false,
       "name": "${SOURCE_NAME}",
-      "render": true,
-      "source_uuid": "${SOURCE_NAME}",
-      "volume": 1.0,
-      "x": 0.0,
-      "y": 0.0,
-      "mixers": 0,
+      "settings": {
+        "color": 1,
+        "custom_css": "",
+        "fps": 30,
+        "height": 720,
+        "is_local_file": false,
+        "local_file": "",
+        "reroute_audio": false,
+        "shutdown_source": true,
+        "url": "${APP_URL}",
+        "width": 1280
+      },
+      "sync": 0,
+      "type": "browser_source",
+      "versioned_id": "browser_source_v2",
+      "volume": 1
+    },
+    "${SCENE_NAME}": {
+      "balance": 0,
       "deinterlace_field_order": 0,
       "deinterlace_mode": 0,
-      "filters": [],
-      "monitoring_type": 0,
-      "settings": {
-        "is_local_file": false,
-        "url": "${APP_URL}",
-        "width": 1280,
-        "height": 720,
-        "fps": 30
-      },
-      "type": "browser_source"
-    },
-    {
-      "alignment": 5,
-      "cx": 1280,
-      "cy": 720,
-      "id": 2,
-      "locked": false,
+      "enabled": true,
+      "flags": 2,
+      "hotkeys": {},
+      "id": "scene",
+      "mixers": 0,
       "muted": false,
       "name": "${SCENE_NAME}",
-      "render": true,
-      "source_uuid": "${SCENE_NAME}",
-      "volume": 1.0,
-      "mixers": 0,
-      "deinterlace_field_order": 0,
-      "deinterlace_mode": 0,
-      "filters": [],
-      "monitoring_type": 0,
-      "settings": {
-        "items": [
-          {
-            "align": 5,
-            "bounds_align": 0,
-            "bounds_height": 0.0,
-            "bounds_type": 0,
-            "bounds_width": 0.0,
-            "crop_bottom": 0,
-            "crop_left": 0,
-            "crop_right": 0,
-            "crop_top": 0,
-            "id": 1,
-            "name": "${SOURCE_NAME}",
-            "pos": {"x": 0.0, "y": 0.0},
-            "rot": 0.0,
-            "scale": {"x": 1.0, "y": 1.0},
-            "visible": true
-          }
-        ]
-      },
-      "type": "scene"
+      "settings": {},
+      "sources": [
+        {
+          "balance": 0,
+          "deinterlace_field_order": 0,
+          "deinterlace_mode": 0,
+          "enabled": true,
+          "flags": 0,
+          "hotkeys": {},
+          "id": "${SOURCE_NAME}",
+          "mixers": 0,
+          "muted": false,
+          "name": "${SOURCE_NAME}",
+          "settings": {},
+          "sync": 0,
+          "type": "browser_source",
+          "volume": 1
+        }
+      ],
+      "sync": 0,
+      "type": "scene",
+      "versioned_id": "scene",
+      "volume": 1
     }
-  ]
+  },
+  "sources_version": 2,
+  "transition_duration": 300,
+  "transitions": {
+    "Default": {
+      "duration": 300,
+      "id": "fade_transition"
+    }
+  },
+  "uids": [
+    "${SCENE_NAME}",
+    "${SOURCE_NAME}"
+  ],
+  "version": 1
 }
 SCENE
 
@@ -270,7 +284,27 @@ cat <<SERVICE | run_as_streamer tee "$CONFIG_ROOT/basic/profiles/${COLLECTION_NA
 SERVICE
 
 cat <<COLLECTION | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/Basic.json" >/dev/null
-{"current_program_scene":"${SCENE_NAME}","current_scene":"${SCENE_NAME}","name":"${COLLECTION_NAME}","scene_order":[{"name":"${SCENE_NAME}"}],"sources":[]}
+{
+  "current_program": "${SCENE_NAME}",
+  "current_preview": "${SCENE_NAME}",
+  "current_transition": "Default",
+  "groups": {},
+  "modules": {},
+  "preview_locked": false,
+  "quick_transitions": [],
+  "scene_order": ["${SCENE_NAME}"],
+  "sources": {},
+  "sources_version": 2,
+  "transition_duration": 300,
+  "transitions": {
+    "Default": {
+      "duration": 300,
+      "id": "fade_transition"
+    }
+  },
+  "uids": [],
+  "version": 1
+}
 COLLECTION
 
 cat <<SCENE_LIST | run_as_streamer tee "$CONFIG_ROOT/basic/scene_collections.json" >/dev/null
