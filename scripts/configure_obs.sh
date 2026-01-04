@@ -241,9 +241,40 @@ if ! jq . "${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json" >/dev/null; then
     exit 1
 fi
 
-# Select encoder and bitrate defaults
+# Select encoder and bitrate defaults (lighter baseline; override with VIDEO_BITRATE/AUDIO_BITRATE)
 ENCODER="$(select_encoder)"
-VIDEO_BITRATE="${VIDEO_BITRATE:-3500}"
+AUDIO_BITRATE="${AUDIO_BITRATE:-128}"
+VIDEO_BITRATE="${VIDEO_BITRATE:-2500}"
+YOUTUBE_AUDIO_MIN=128
+
+# Validate bitrate choices against YouTube's published guidance for common 30fps tiers
+validate_youtube_recommendations() {
+    local tier="1080p@30" min_video=4500 max_video=9000
+
+    if (( VIDEO_BASE_HEIGHT <= 576 )); then
+        tier="480p@30"
+        min_video=1500
+        max_video=4000
+    elif (( VIDEO_BASE_HEIGHT <= 720 )); then
+        tier="720p@30"
+        min_video=2500
+        max_video=6000
+    fi
+
+    if (( VIDEO_BITRATE < min_video || VIDEO_BITRATE > max_video )); then
+        echo "Warning: VIDEO_BITRATE=${VIDEO_BITRATE}kbps falls outside YouTube's ${tier} guidance (${min_video}-${max_video}kbps)." >&2
+    else
+        echo "Video bitrate aligns with YouTube's ${tier} guidance (${min_video}-${max_video}kbps)."
+    fi
+
+    if (( AUDIO_BITRATE < YOUTUBE_AUDIO_MIN )); then
+        echo "Warning: AUDIO_BITRATE=${AUDIO_BITRATE}kbps is below YouTube's recommended minimum (${YOUTUBE_AUDIO_MIN}kbps AAC-LC)." >&2
+    else
+        echo "Audio bitrate meets YouTube's recommended minimum (${YOUTUBE_AUDIO_MIN}kbps AAC-LC)."
+    fi
+}
+
+validate_youtube_recommendations
 if [[ "$ENCODER" == "x264" ]]; then
     ADV_PRESET="${ADV_PRESET:-superfast}"
 else
@@ -251,7 +282,7 @@ else
     ADV_PRESET="${ADV_PRESET:-default}"
 fi
 
-echo "OBS encoder selected: ${ENCODER} (bitrate=${VIDEO_BITRATE}kbps, preset=${ADV_PRESET})"
+echo "OBS encoder selected: ${ENCODER} (video=${VIDEO_BITRATE}kbps, audio=${AUDIO_BITRATE}kbps, preset=${ADV_PRESET})"
 echo "Video base/output resolution locked to ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT} (RescaleOutput=0) to avoid extra scaling."
 
 # Profile basic.ini with YouTube opts
@@ -280,7 +311,7 @@ ApplyBitrate=1
 
 [SimpleOutput]
 VBitrate=${VIDEO_BITRATE}
-ABitrate=128
+ABitrate=${AUDIO_BITRATE}
 
 [AdvOut]
 Encoder=${ENCODER}
@@ -292,6 +323,7 @@ Tune=zerolatency
 PsychoVisualTuning=0
 Lookahead=0
 Bframes=0
+Track1Bitrate=${AUDIO_BITRATE}
 
 [Service]
 Projector=rtmp://a.rtmp.youtube.com/live2
