@@ -8,6 +8,9 @@ APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 ENV_FILE=${ENV_FILE:-/etc/youtube-stream/env}
 COLLECTION_NAME=${COLLECTION_NAME:-YouTubeHeadless}
+VIDEO_BASE_WIDTH=${VIDEO_BASE_WIDTH:-1024}
+VIDEO_BASE_HEIGHT=${VIDEO_BASE_HEIGHT:-576}
+LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-1}
 REACT_SERVICE=react-web.service
 OBS_SERVICE=obs-headless.service
 
@@ -112,7 +115,8 @@ Environment=HOME=${OBS_HOME}
 Environment=XDG_CONFIG_HOME=${OBS_HOME}/.config
 Environment=XDG_CACHE_HOME=${OBS_HOME}/.cache
 EnvironmentFile=${ENV_FILE}
-ExecStart=/usr/bin/xvfb-run -a obs --collection YouTubeHeadless --profile YouTubeHeadless --scene WebScene --startstreaming --minimize-to-tray --disable-updater --disable-shutdown-check
+Environment=LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x24 -ac +extension GLX +render -noreset" obs --collection YouTubeHeadless --profile YouTubeHeadless --scene WebScene --startstreaming --minimize-to-tray --disable-updater --disable-shutdown-check
 Restart=on-failure
 RestartSec=5
 

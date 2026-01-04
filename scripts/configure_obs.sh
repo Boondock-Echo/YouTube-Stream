@@ -17,6 +17,7 @@ ENV_DIR="$(dirname "${ENV_FILE}")"
 VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1024}"
 VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-576}"
 ENABLE_BROWSER_SOURCE_HW_ACCEL="${ENABLE_BROWSER_SOURCE_HW_ACCEL:-0}"
+LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
 
 # Helper: Run as streamer user
 run_as_streamer() {
@@ -310,6 +311,11 @@ fi
 echo "OBS encoder selected: ${ENCODER} (video=${VIDEO_BITRATE}kbps, audio=${AUDIO_BITRATE}kbps, preset=${ADV_PRESET})"
 echo "Video base/output resolution locked to ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT} (RescaleOutput=0) to avoid extra scaling."
 
+OUTPUT_ENCODER="${ENCODER}"
+if [[ "$ENCODER" == "x264" ]]; then
+    OUTPUT_ENCODER="obs_x264"
+fi
+
 # Profile basic.ini with YouTube opts
 cat > "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/basic.ini" << PROFILE
 [General]
@@ -327,7 +333,7 @@ OutputCY=${VIDEO_BASE_HEIGHT}
 
 [Output]
 Mode=Advanced
-Encoder=${ENCODER}
+Encoder=${OUTPUT_ENCODER}
 RescaleOutput=0
 ColorFormat=NV12
 ColorSpace=709
@@ -339,7 +345,7 @@ VBitrate=${VIDEO_BITRATE}
 ABitrate=${AUDIO_BITRATE}
 
 [AdvOut]
-Encoder=${ENCODER}
+Encoder=${OUTPUT_ENCODER}
 Bitrate=${VIDEO_BITRATE}
 KeyframeIntervalSeconds=2
 Preset=${ADV_PRESET}
@@ -412,7 +418,8 @@ Group=streamer
 Environment=HOME=/var/lib/streamer
 Environment=DISPLAY=:99
 Environment=CEF_DISABLE_SANDBOX=1
-ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x16 +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --scene ${SCENE_NAME} --startstreaming
+Environment=LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x24 -ac +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --scene ${SCENE_NAME} --startstreaming
 Restart=always
 RestartSec=5
 
