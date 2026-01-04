@@ -21,7 +21,7 @@ fi
 
 # Update apt metadata and install base tools
 apt-get update
-apt-get install -y ca-certificates curl gnupg software-properties-common build-essential ffmpeg xvfb git
+apt-get install -y ca-certificates curl gnupg software-properties-common build-essential ffmpeg xvfb git jq curl
 
 # Install Node.js from NodeSource if missing or too old
 if ! command_exists node || ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= ${NODE_MAJOR} ? 0 : 1)"; then

@@ -1,0 +1,10 @@
+{
+  "STREAM_USER": "streamer",
+  "OBS_HOME": "/var/lib/streamer",
+  "COLLECTION_NAME": "YouTubeHeadless",
+  "SCENE_NAME": "WebScene",
+  "SOURCE_NAME": "BrowserSource",
+  "STREAM_KEY": "kdyd-zy0c-57zu-9evj-25wj",
+  "STREAM_URL": "rtmp://a.rtmp.youtube.com/live2",
+  "APP_URL": "http://localhost:3000"
+}
