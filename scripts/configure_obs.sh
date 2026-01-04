@@ -10,7 +10,7 @@ CONFIG_JSON="${SCRIPT_DIR}/config.json"
 COLLECTION_NAME="YouTubeHeadless"
 CONFIG_ROOT="/var/lib/streamer/.config/obs-studio"
 GLOBAL_INI="${CONFIG_ROOT}/global.ini"
-APP_DIR="/opt/youtube-stream/webapp"
+APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
 ENV_FILE="/etc/youtube-stream/env"
 ENV_DIR="$(dirname "${ENV_FILE}")"
 # Keep base/output aligned to avoid extra OBS rescaling.
@@ -111,6 +111,10 @@ if [[ -z "$YOUTUBE_STREAM_KEY" ]]; then
 fi
 if ! [[ "$VIDEO_BASE_WIDTH" =~ ^[0-9]+$ && "$VIDEO_BASE_HEIGHT" =~ ^[0-9]+$ ]]; then
     echo "Error: VIDEO_BASE_WIDTH/VIDEO_BASE_HEIGHT must be integers." >&2
+    exit 1
+fi
+if [[ ! -f "${APP_DIR}/package.json" ]]; then
+    echo "Error: React app not found at ${APP_DIR}. Run scripts/bootstrap_react_app.sh first (or set APP_DIR)." >&2
     exit 1
 fi
 
@@ -397,7 +401,10 @@ User=streamer
 WorkingDirectory=${APP_DIR}
 Environment=HOST=0.0.0.0
 Environment=PORT=3000
-ExecStart=/usr/bin/npx --yes serve -s build -l 3000 --listen tcp://0.0.0.0:3000
+Environment=NODE_ENV=production
+ExecStartPre=/bin/bash -lc 'cd ${APP_DIR} && [ -d node_modules ] || npm install'
+ExecStartPre=/bin/bash -lc 'cd ${APP_DIR} && npm run build'
+ExecStart=/usr/bin/npx --yes serve -s build -l tcp://0.0.0.0:3000
 Restart=always
 RestartSec=5
 
