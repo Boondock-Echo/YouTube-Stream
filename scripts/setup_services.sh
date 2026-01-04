@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Creates and enables systemd services for the React dev server and headless OBS streaming.
+# Creates and enables systemd services for the built React frontend and headless OBS streaming.
 
 STREAM_USER=${STREAM_USER:-streamer}
 APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
@@ -19,6 +19,10 @@ if [ ! -f "$APP_DIR/package.json" ]; then
   echo "React app not found at $APP_DIR. Run scripts/bootstrap_react_app.sh first." >&2
   exit 1
 fi
+
+# Build the React app so the production bundle is available for the service.
+echo "Installing dependencies and building React app at ${APP_DIR}..."
+sudo -u "${STREAM_USER}" HOME="${OBS_HOME}" bash -c "cd '${APP_DIR}' && npm install && npm run build"
 
 install -d -m 750 "$(dirname "$ENV_FILE")"
 if [ ! -f "$ENV_FILE" ]; then
@@ -45,9 +49,10 @@ User=${STREAM_USER}
 WorkingDirectory=${APP_DIR}
 Environment=HOST=0.0.0.0
 Environment=PORT=3000
-Environment=BROWSER=none
-Environment=CI=true
-ExecStart=/usr/bin/npm start
+Environment=NODE_ENV=production
+ExecStartPre=/bin/bash -lc 'cd ${APP_DIR} && [ -d node_modules ] || npm install'
+ExecStartPre=/bin/bash -lc 'cd ${APP_DIR} && npm run build'
+ExecStart=/usr/bin/npx --yes serve -s build -l tcp://0.0.0.0:3000
 Restart=on-failure
 RestartSec=5
 
