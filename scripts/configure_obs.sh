@@ -311,6 +311,11 @@ fi
 echo "OBS encoder selected: ${ENCODER} (video=${VIDEO_BITRATE}kbps, audio=${AUDIO_BITRATE}kbps, preset=${ADV_PRESET})"
 echo "Video base/output resolution locked to ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT} (RescaleOutput=0) to avoid extra scaling."
 
+OUTPUT_ENCODER="${ENCODER}"
+if [[ "$ENCODER" == "x264" ]]; then
+    OUTPUT_ENCODER="obs_x264"
+fi
+
 # Profile basic.ini with YouTube opts
 cat > "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/basic.ini" << PROFILE
 [General]
@@ -328,7 +333,7 @@ OutputCY=${VIDEO_BASE_HEIGHT}
 
 [Output]
 Mode=Advanced
-Encoder=${ENCODER}
+Encoder=${OUTPUT_ENCODER}
 RescaleOutput=0
 ColorFormat=NV12
 ColorSpace=709
@@ -340,7 +345,7 @@ VBitrate=${VIDEO_BITRATE}
 ABitrate=${AUDIO_BITRATE}
 
 [AdvOut]
-Encoder=${ENCODER}
+Encoder=${OUTPUT_ENCODER}
 Bitrate=${VIDEO_BITRATE}
 KeyframeIntervalSeconds=2
 Preset=${ADV_PRESET}
