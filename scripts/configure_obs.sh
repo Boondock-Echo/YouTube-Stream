@@ -138,13 +138,6 @@ if ! id -u "$STREAM_USER" >/dev/null 2>&1; then
   fi
 fi
 
-mkdir -p "$OBS_HOME"
-if [[ "$current_uid" -eq 0 ]]; then
-  chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME"
-fi
-
-mkdir -p "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}" "$CONFIG_ROOT/basic/scenes" "$OBS_HOME/logs" "$CACHE_ROOT"
-
 run_as_streamer() {
   if [[ "$current_user" == "$STREAM_USER" ]]; then
     "$@"
@@ -152,6 +145,13 @@ run_as_streamer() {
     sudo -u "$STREAM_USER" "$@"
   fi
 }
+
+mkdir -p "$OBS_HOME"
+if [[ "$current_uid" -eq 0 ]]; then
+  chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME"
+fi
+
+run_as_streamer mkdir -p "$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}" "$CONFIG_ROOT/basic/scenes" "$OBS_HOME/logs" "$CACHE_ROOT"
 
 # Scene collection with a single browser source pointing to the React app
 cat <<SCENE | run_as_streamer tee "$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.json" >/dev/null
