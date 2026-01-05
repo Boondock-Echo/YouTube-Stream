@@ -11,6 +11,7 @@ COLLECTION_NAME="YouTubeHeadless"
 CONFIG_ROOT="/var/lib/streamer/.config/obs-studio"
 GLOBAL_INI="${CONFIG_ROOT}/global.ini"
 APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
+APP_URL="${APP_URL:-127.0.0.1:3000}"
 ENV_FILE="/etc/youtube-stream/env"
 ENV_DIR="$(dirname "${ENV_FILE}")"
 # Keep base/output aligned to avoid extra OBS rescaling.
@@ -84,14 +85,18 @@ fi
 # Prompt or load config
 if [[ -f "${CONFIG_JSON}" ]]; then
     source <(jq -r 'to_entries|map("\(.key)=\(.value)")|join("\n")' "${CONFIG_JSON}")
+    SCENE_NAME="${SCENE_NAME:-${scene:-WebScene}}"
+    SOURCE_NAME="${SOURCE_NAME:-${source:-BrowserSource}}"
+    APP_URL="${APP_URL:-${url:-127.0.0.1:3000}}"
+    YOUTUBE_STREAM_KEY="${YOUTUBE_STREAM_KEY:-${key}}"
 else
     echo "=== Configuration Prompts ==="
     read -p "Scene name [WebScene]: " SCENE_NAME
     SCENE_NAME=${SCENE_NAME:-WebScene}
     read -p "Source name [BrowserSource]: " SOURCE_NAME
     SOURCE_NAME=${SOURCE_NAME:-BrowserSource}
-    read -p "App URL [http://localhost:3000]: " APP_URL
-    APP_URL=${APP_URL:-http://localhost:3000}
+    read -p "App URL [${APP_URL}]: " APP_URL_INPUT
+    APP_URL=${APP_URL_INPUT:-${APP_URL}}
     read -p "YouTube Stream Key: " YOUTUBE_STREAM_KEY
 
     # Save config
