@@ -54,7 +54,7 @@ sudo systemctl restart obs-headless.service
   - `STREAM_USER` (default `streamer`)
   - `OBS_HOME` (default `/var/lib/<STREAM_USER>`, `/var/lib/streamer` by default)
   - `APP_URL` (default `http://localhost:3000` in `configure_obs.sh`)
-  - `VIDEO_BITRATE` and `AUDIO_BITRATE` (defaults `2500`/`128` kbps) for lighter baseline output. `configure_obs.sh` warns if your values fall outside YouTube’s guidance for the chosen resolution and checks that audio meets the recommended minimum.
+  - `VIDEO_BITRATE` and `AUDIO_BITRATE` (defaults `1000`/`128` kbps) for lighter baseline output. `configure_obs.sh` warns if your values fall outside YouTube’s guidance for the chosen resolution and checks that audio meets the recommended minimum.
   - Force software OpenGL when headless/virtualized GPUs are unstable: `LIBGL_ALWAYS_SOFTWARE=1` (default) keeps OBS on software rendering to avoid swapchain failures.
 - Browser source hardware acceleration:
   - Default **disabled** for stability in headless/virtualized environments where GPU drivers or OpenGL support may be limited.
