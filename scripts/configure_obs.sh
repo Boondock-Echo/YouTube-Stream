@@ -162,6 +162,7 @@ chown root:root "${ENV_FILE}"
 cat > "${GLOBAL_INI}" << GLOBAL
 [General]
 EnableBrowserSourceHardwareAcceleration=${ENABLE_BROWSER_SOURCE_HW_ACCEL}
+FirstRun=false
 
 [BrowserSource]
 CEFLogging=1
@@ -176,14 +177,16 @@ chown streamer:streamer "${GLOBAL_INI}"
 # Fixed scene JSON (hierarchical, with silent audio)
 cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
 {
-  "current_program": "${SCENE_NAME}",
-  "current_preview": "${SCENE_NAME}",
+  "name": "${COLLECTION_NAME}",
+  "current_program_scene": "${SCENE_NAME}",
+  "current_preview_scene": "${SCENE_NAME}",
+  "current_scene": "${SCENE_NAME}",
   "current_transition": "Default",
   "groups": {},
   "modules": {},
   "preview_locked": false,
   "quick_transitions": [],
-  "scene_order": ["${SCENE_NAME}"],
+  "scene_order": [{"name": "${SCENE_NAME}"}],
   "sources": {
     "${SOURCE_NAME}": {
       "balance": 0,
@@ -284,6 +287,10 @@ cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
   "version": 1
 }
 SCENE
+
+# Mirror the primary scene into the default collection name so OBS cannot fall back
+# to an empty Untitled scene when it regenerates defaults.
+run_as_streamer cp "${SCENE_FILE}" "${CONFIG_ROOT}/basic/scenes/Untitled.json"
 
 # Validate JSON
 if ! jq . "${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json" >/dev/null; then
