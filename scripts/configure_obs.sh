@@ -9,6 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_JSON="${SCRIPT_DIR}/config.json"
 COLLECTION_NAME="YouTubeHeadless"
 CONFIG_ROOT="/var/lib/streamer/.config/obs-studio"
+SCENE_FILE="${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json"
 GLOBAL_INI="${CONFIG_ROOT}/global.ini"
 APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
 APP_URL="${APP_URL:-http://127.0.0.1:3000}"
@@ -143,6 +144,12 @@ chown root:root "${ENV_DIR}"
 mkdir -p "${CONFIG_ROOT}/basic/scenes" "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
 chown -R streamer:streamer /var/lib/streamer/.config
 chmod 755 /var/lib/streamer
+
+# Remove the existing scene collection so the latest settings are written cleanly
+if [[ -f "${SCENE_FILE}" ]]; then
+    echo "Removing existing scene file at ${SCENE_FILE} to recreate it."
+    rm -f "${SCENE_FILE}"
+fi
 # Env file
 echo "YOUTUBE_STREAM_KEY=${YOUTUBE_STREAM_KEY}" > "${ENV_FILE}"
 chmod 640 "${ENV_FILE}"
@@ -164,7 +171,7 @@ run_as_streamer "touch '${GLOBAL_INI}'"  # Ensures ownership
 chown streamer:streamer "${GLOBAL_INI}"
 
 # Fixed scene JSON (hierarchical, with silent audio)
-cat << SCENE | run_as_streamer tee "${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json" >/dev/null
+cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
 {
   "current_program": "${SCENE_NAME}",
   "current_preview": "${SCENE_NAME}",
