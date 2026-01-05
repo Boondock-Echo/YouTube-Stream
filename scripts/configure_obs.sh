@@ -11,7 +11,8 @@ COLLECTION_NAME="YouTubeHeadless"
 CONFIG_ROOT="/var/lib/streamer/.config/obs-studio"
 GLOBAL_INI="${CONFIG_ROOT}/global.ini"
 APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
-APP_URL="${APP_URL:-127.0.0.1:3000}"
+APP_URL="${APP_URL:-http://127.0.0.1:3000}"
+STREAM_URL="${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}"
 ENV_FILE="/etc/youtube-stream/env"
 ENV_DIR="$(dirname "${ENV_FILE}")"
 # Keep base/output aligned to avoid extra OBS rescaling.
@@ -87,7 +88,7 @@ if [[ -f "${CONFIG_JSON}" ]]; then
     source <(jq -r 'to_entries|map("\(.key)=\(.value)")|join("\n")' "${CONFIG_JSON}")
     SCENE_NAME="${SCENE_NAME:-${scene:-WebScene}}"
     SOURCE_NAME="${SOURCE_NAME:-${source:-BrowserSource}}"
-    APP_URL="${APP_URL:-${url:-127.0.0.1:3000}}"
+    APP_URL="${APP_URL:-${url:-http://127.0.0.1:3000}}"
     YOUTUBE_STREAM_KEY="${YOUTUBE_STREAM_KEY:-${key}}"
 else
     echo "=== Configuration Prompts ==="
@@ -107,6 +108,11 @@ else
         --arg key "$YOUTUBE_STREAM_KEY" \
         '{scene: $scene, source: $source, url: $url, key: $key}' \
         > "${CONFIG_JSON}"
+fi
+
+# Normalize the app URL to include a protocol so OBS browser source resolves correctly
+if [[ -n "${APP_URL}" && ! "${APP_URL}" =~ ^https?:// ]]; then
+    APP_URL="http://${APP_URL}"
 fi
 
 # Validate inputs
@@ -149,6 +155,10 @@ EnableBrowserSourceHardwareAcceleration=${ENABLE_BROWSER_SOURCE_HW_ACCEL}
 
 [BrowserSource]
 CEFLogging=1
+
+[Basic]
+Profile=${COLLECTION_NAME}
+Collection=${COLLECTION_NAME}
 GLOBAL
 run_as_streamer "touch '${GLOBAL_INI}'"  # Ensures ownership
 chown streamer:streamer "${GLOBAL_INI}"
@@ -366,10 +376,22 @@ Bframes=0
 Track1Bitrate=${AUDIO_BITRATE}
 
 [Service]
-Projector=rtmp://a.rtmp.youtube.com/live2
+Projector=${STREAM_URL}
 Key=${YOUTUBE_STREAM_KEY}
 PROFILE
 chown -R streamer:streamer "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
+
+cat > "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/service.json" << SERVICE
+{
+  "type": "rtmp_common",
+  "settings": {
+    "service": "YouTube - RTMPS",
+    "server": "${STREAM_URL}",
+    "key": "${YOUTUBE_STREAM_KEY}"
+  }
+}
+SERVICE
+chown streamer:streamer "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/service.json"
 
 # Registries
 cat << REGISTRY | run_as_streamer tee "${CONFIG_ROOT}/basic/scene_collections.json" >/dev/null
