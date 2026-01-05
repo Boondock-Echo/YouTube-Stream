@@ -523,7 +523,8 @@ plugin_candidates() {
 
 is_plugin_installed() {
   local primary="${1,,}"
-  local alt="${2,,}"
+  local alt=${2:-}
+  alt="${alt,,}"
   if plugin_is_builtin "$primary"; then
     return 0
   fi
