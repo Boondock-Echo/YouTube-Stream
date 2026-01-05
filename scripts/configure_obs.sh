@@ -10,6 +10,7 @@ CONFIG_JSON="${SCRIPT_DIR}/config.json"
 COLLECTION_NAME="YouTubeHeadless"
 CONFIG_ROOT="/var/lib/streamer/.config/obs-studio"
 SCENE_FILE="${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json"
+UNTITLED_SCENE_FILE="${CONFIG_ROOT}/basic/scenes/Untitled.json"
 GLOBAL_INI="${CONFIG_ROOT}/global.ini"
 APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
 APP_URL="${APP_URL:-http://127.0.0.1:3000}"
@@ -288,9 +289,10 @@ cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
 }
 SCENE
 
-# Mirror the primary scene into the default collection name so OBS cannot fall back
-# to an empty Untitled scene when it regenerates defaults.
-run_as_streamer cp "${SCENE_FILE}" "${CONFIG_ROOT}/basic/scenes/Untitled.json"
+if [[ -f "${UNTITLED_SCENE_FILE}" ]]; then
+    echo "Removing default scene file at ${UNTITLED_SCENE_FILE} to keep a single collection."
+    run_as_streamer rm -f "${UNTITLED_SCENE_FILE}"
+fi
 
 # Validate JSON
 if ! jq . "${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json" >/dev/null; then
