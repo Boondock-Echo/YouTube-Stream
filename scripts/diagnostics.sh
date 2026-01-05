@@ -27,6 +27,9 @@ SKIP_SYSTEMD=0
 SKIP_NETWORK=0
 CHECK_BUILD=0
 LATEST_OBS_LOG=""
+INSTALLED_OBS_MODULES=()
+INSTALLED_OBS_PLUGIN_DIRS=()
+SCENE_FILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -111,6 +114,57 @@ check_node_version() {
     log_pass "Node.js version $major detected (>= $required_major)"
   else
     log_fail "Node.js version $major is below required $required_major"
+  fi
+}
+
+collect_obs_plugins() {
+  local -A seen
+  local modules=()
+  INSTALLED_OBS_PLUGIN_DIRS=()
+
+  for dir in /usr/lib*/obs-plugins; do
+    [[ -d "$dir" ]] || continue
+    INSTALLED_OBS_PLUGIN_DIRS+=("$dir")
+    while IFS= read -r plugin; do
+      [[ -z "$plugin" ]] && continue
+      local base="${plugin%.so}"
+      local lower=${base,,}
+      if [[ -z "${seen[$lower]:-}" ]]; then
+        seen[$lower]=1
+        modules+=("$lower")
+      fi
+    done < <(find "$dir" -maxdepth 1 -type f -name "*.so" -printf '%f\n' 2>/dev/null | sort -u)
+  done
+
+  INSTALLED_OBS_MODULES=("${modules[@]}")
+}
+
+check_obs_installation() {
+  collect_obs_plugins
+
+  if command -v obs >/dev/null 2>&1; then
+    local version output
+    output=$(obs --version 2>&1 || true)
+    version=$(grep -oE 'OBS [^ ]+' <<<"$output" | head -n1 || true)
+    if [[ -n "$version" ]]; then
+      log_pass "OBS detected (${version})"
+    else
+      log_pass "OBS detected; version output: ${output%%$'\n'*}"
+    fi
+  else
+    log_fail "obs binary not found (install OBS Studio)"
+  fi
+
+  if [[ ${#INSTALLED_OBS_PLUGIN_DIRS[@]} -gt 0 ]]; then
+    log_pass "OBS plugin directories: ${INSTALLED_OBS_PLUGIN_DIRS[*]}"
+  else
+    log_warn "No OBS plugin directories found under /usr/lib*/obs-plugins"
+  fi
+
+  if [[ ${#INSTALLED_OBS_MODULES[@]} -gt 0 ]]; then
+    log_pass "Detected OBS plugins/modules: ${INSTALLED_OBS_MODULES[*]}"
+  else
+    log_warn "No OBS plugin shared libraries detected; browser/vlc sources will fail to load"
   fi
 }
 
@@ -272,6 +326,7 @@ check_obs_config() {
   local basic_ini="$profile_dir/basic.ini"
   local scene_registry="$config_root/basic/scene_collections.json"
   local profile_registry="$config_root/basic/profiles.json"
+  SCENE_FILE="$scene_file"
 
   if [[ -d "$config_root" ]]; then
     log_pass "OBS config directory present at $config_root"
@@ -438,6 +493,180 @@ $(tail -n 25 "$log_file" || true)
 ---------------------------
 EOF
 )"
+  fi
+}
+
+plugin_is_builtin() {
+  local id="${1,,}"
+  case "$id" in
+    ""|scene|group|transition|studio_mode|browser|audio_line|audio_input_capture|audio_output_capture|monitor_capture)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+plugin_candidates() {
+  local id="${1,,}"
+  case "$id" in
+    browser_source) echo "browser_source obs-browser browser" ;;
+    vlc_source) echo "vlc_source vlc-video vlc" ;;
+    ffmpeg_source) echo "ffmpeg_source obs-ffmpeg" ;;
+    text_ft2_source) echo "text_ft2_source text-freetype2" ;;
+    image_source) echo "image_source image-source" ;;
+    image_slide_show) echo "image_slide_show image-slideshow slideshow" ;;
+    *) echo "$id" ;;
+  esac
+}
+
+is_plugin_installed() {
+  local primary="${1,,}"
+  local alt="${2,,}"
+  if plugin_is_builtin "$primary"; then
+    return 0
+  fi
+
+  local candidates=()
+  read -r -a candidates <<<"$(plugin_candidates "$primary")"
+  if [[ -n "$alt" && "$alt" != "$primary" ]]; then
+    candidates+=("$alt")
+  fi
+
+  for candidate in "${candidates[@]}"; do
+    local normalized="${candidate,,}"
+    for mod in "${INSTALLED_OBS_MODULES[@]}"; do
+      if [[ "$mod" == "$normalized" || "$mod" == "obs-$normalized" || "obs-$mod" == "$normalized" ]]; then
+        return 0
+      fi
+    done
+  done
+
+  return 1
+}
+
+check_scene_plugins() {
+  if [[ -z "$SCENE_FILE" || ! -f "$SCENE_FILE" ]]; then
+    log_warn "Cannot analyze scene plugins; scene file missing (${SCENE_FILE:-unset})"
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    log_warn "jq not available; skipping scene plugin enumeration"
+    return
+  fi
+
+  local modules_required scene_entries browser_seen=0 vlc_seen=0 missing_plugins=()
+
+  modules_required=$(jq -r '.modules? // [] | .[]' "$SCENE_FILE" 2>/dev/null || true)
+  if [[ -n "$modules_required" ]]; then
+    local missing_modules=()
+    while IFS= read -r mod; do
+      [[ -z "$mod" ]] && continue
+      if ! is_plugin_installed "$mod"; then
+        missing_modules+=("$mod")
+      fi
+    done <<<"$modules_required"
+
+    if [[ ${#missing_modules[@]} -gt 0 ]]; then
+      log_warn "Scene modules listed in ${SCENE_FILE} not installed: ${missing_modules[*]}"
+    else
+      log_pass "All scene-declared modules present"
+    fi
+  fi
+
+  scene_entries=$(jq -r '
+    [
+      .. | objects
+      | select(has("id") or has("type"))
+      | {id:(.id // ""), type:(.type // ""), name:(.name // .settings?.name // "")}
+    ]
+    | map("\(.id)|\(.type)|\(.name)") | unique[]
+  ' "$SCENE_FILE" 2>/dev/null || true)
+
+  if [[ -z "$scene_entries" ]]; then
+    log_warn "No sources with id/type fields found in scene file $SCENE_FILE"
+    return
+  fi
+
+  while IFS="|" read -r sid stype sname; do
+    local label="${sname:-$sid}"
+    [[ "$sid" == "browser_source" || "$stype" == "browser_source" ]] && browser_seen=1
+    [[ "$sid" == "vlc_source" || "$stype" == "vlc_source" ]] && vlc_seen=1
+
+    if ! is_plugin_installed "${stype:-$sid}" "$sid"; then
+      local desc="${stype:-$sid}"
+      missing_plugins+=("${desc:-unknown} (source=${label:-unnamed})")
+    fi
+  done <<<"$scene_entries"
+
+  if [[ ${#missing_plugins[@]} -gt 0 ]]; then
+    log_warn "Scene references missing or unknown plugin types: ${missing_plugins[*]}"
+  else
+    log_pass "All scene source ids/types appear to match installed plugins"
+  fi
+
+  if [[ $browser_seen -eq 1 ]] && ! is_plugin_installed "browser_source"; then
+    log_warn "Scene references browser sources but obs-browser plugin is not installed (install obs-browser or obs-plugins-browser package)."
+  fi
+
+  if [[ $vlc_seen -eq 1 ]] && ! is_plugin_installed "vlc_source"; then
+    log_warn "Scene references VLC sources but vlc-video plugin is not installed (install obs-vlc or obs-plugins-vlc package)."
+  fi
+}
+
+run_obs_dry_run() {
+  if [[ -z "$SCENE_FILE" || ! -f "$SCENE_FILE" ]]; then
+    log_warn "Skipping OBS dry-run load; scene file missing (${SCENE_FILE:-unset})"
+    return
+  fi
+
+  if ! command -v obs >/dev/null 2>&1; then
+    log_warn "Skipping OBS dry-run load; obs binary not found"
+    return
+  fi
+
+  if ! command -v xvfb-run >/dev/null 2>&1; then
+    log_warn "Skipping OBS dry-run load; xvfb-run not available"
+    return
+  fi
+
+  local run_log="/tmp/obs-headless-dry-run.log"
+  local cmd=(obs --collection "$COLLECTION_NAME" --profile "$COLLECTION_NAME" --scene "$SCENE_NAME" --unfiltered_log --disable-updater --disable-shutdown-check --minimize-to-tray --quit)
+
+  if is_root && id -u "$STREAM_USER" >/dev/null 2>&1; then
+    cmd=(sudo -u "$STREAM_USER" HOME="$OBS_HOME" XDG_CONFIG_HOME="$OBS_HOME/.config" XDG_CACHE_HOME="$OBS_HOME/.cache" "${cmd[@]}")
+  fi
+
+  cmd=(xvfb-run -a -s "-screen 0 1920x1080x24" "${cmd[@]}")
+
+  echo "Running OBS dry-run load to validate scene collection (logs: $run_log)"
+  local status
+  set +e
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 45s "${cmd[@]}" >"$run_log" 2>&1
+    status=$?
+  else
+    "${cmd[@]}" >"$run_log" 2>&1
+    status=$?
+  fi
+  set -e
+
+  if [[ $status -eq 0 ]]; then
+    log_pass "OBS dry-run load succeeded (see $run_log for details)"
+    return
+  fi
+
+  log_warn "OBS dry-run load failed (exit $status). Review $run_log for loader errors."
+  append_obs_log_note "$(cat <<EOF
+OBS dry-run load failed (exit $status). Check $run_log for parser/loader errors. Ensure plugins referenced in ${SCENE_FILE} are installed and the collection/profile names match (${COLLECTION_NAME}/${COLLECTION_NAME}).
+EOF
+)"
+
+  if find_latest_obs_log; then
+    print_latest_obs_log_tail
+    append_obs_log_note "If OBS cannot find plugins (browser/vlc), install obs-browser or vlc-video packages and rerun configure_obs.sh."
   fi
 }
 
@@ -642,6 +871,7 @@ main() {
   check_command ffmpeg "ffmpeg"
   check_command xvfb-run "xvfb-run"
   check_command obs "obs"
+  check_command jq "jq"
   check_command npm "npm"
   check_command npx "npx"
   check_node_version
@@ -649,8 +879,11 @@ main() {
   check_user_permissions
   check_app
   check_env_file
+  check_obs_installation
   describe_permissions
   check_obs_config
+  check_scene_plugins
+  run_obs_dry_run
   compare_stream_keys
 
   if [[ "$SKIP_SYSTEMD" -eq 0 ]]; then
