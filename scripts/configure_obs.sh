@@ -284,17 +284,21 @@ fi
 # Select encoder and bitrate defaults (lighter baseline; override with VIDEO_BITRATE/AUDIO_BITRATE)
 ENCODER="$(select_encoder)"
 AUDIO_BITRATE="${AUDIO_BITRATE:-128}"
-VIDEO_BITRATE="${VIDEO_BITRATE:-2500}"
+VIDEO_BITRATE="${VIDEO_BITRATE:-1000}"
 YOUTUBE_AUDIO_MIN=128
 
 # Validate bitrate choices against YouTube's published guidance for common 30fps tiers
 validate_youtube_recommendations() {
     local tier="1080p@30" min_video=4500 max_video=9000
 
-    if (( VIDEO_BASE_HEIGHT <= 576 )); then
+    if (( VIDEO_BASE_HEIGHT <= 432 )); then
+        tier="360p@30"
+        min_video=400
+        max_video=1000
+    elif (( VIDEO_BASE_HEIGHT <= 576 )); then
         tier="480p@30"
-        min_video=1500
-        max_video=4000
+        min_video=500
+        max_video=2000
     elif (( VIDEO_BASE_HEIGHT <= 720 )); then
         tier="720p@30"
         min_video=2500
