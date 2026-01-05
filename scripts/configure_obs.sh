@@ -6,16 +6,19 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STREAM_USER="${STREAM_USER:-streamer}"
+STREAM_GROUP="${STREAM_GROUP:-${STREAM_USER}}"
+OBS_HOME="${OBS_HOME:-/var/lib/${STREAM_USER}}"
 CONFIG_JSON="${SCRIPT_DIR}/config.json"
 COLLECTION_NAME="YouTubeHeadless"
-CONFIG_ROOT="/var/lib/streamer/.config/obs-studio"
+CONFIG_ROOT="${CONFIG_ROOT:-${OBS_HOME}/.config/obs-studio}"
 SCENE_FILE="${CONFIG_ROOT}/basic/scenes/${COLLECTION_NAME}.json"
 UNTITLED_SCENE_FILE="${CONFIG_ROOT}/basic/scenes/Untitled.json"
 GLOBAL_INI="${CONFIG_ROOT}/global.ini"
 APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
 APP_URL="${APP_URL:-http://127.0.0.1:3000}"
 STREAM_URL="${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}"
-ENV_FILE="/etc/youtube-stream/env"
+ENV_FILE="${ENV_FILE:-/etc/youtube-stream/env}"
 ENV_DIR="$(dirname "${ENV_FILE}")"
 # Keep base/output aligned to avoid extra OBS rescaling.
 VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1024}"
@@ -28,7 +31,7 @@ run_as_streamer() {
     # Use bash -lc with all arguments to preserve quoted strings and allow passing
     # arbitrary commands (including those with pipes or redirection).
     local cmd="$*"
-    sudo -u streamer HOME=/var/lib/streamer bash -lc "$cmd"
+    sudo -u "${STREAM_USER}" HOME="${OBS_HOME}" bash -lc "$cmd"
 }
 
 # Helper: Choose the best available hardware encoder (fallback to x264)
@@ -142,12 +145,14 @@ else
 fi
 
 # Create dirs/ownership
+mkdir -p "${OBS_HOME}"
 mkdir -p "${ENV_DIR}"
 chmod 750 "${ENV_DIR}"
 chown root:root "${ENV_DIR}"
 mkdir -p "${CONFIG_ROOT}/basic/scenes" "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
-chown -R streamer:streamer /var/lib/streamer/.config
-chmod 755 /var/lib/streamer
+chown -R "${STREAM_USER}:${STREAM_GROUP}" "$(dirname "${CONFIG_ROOT}")"
+chmod 755 "${OBS_HOME}"
+chown "${STREAM_USER}:${STREAM_GROUP}" "${OBS_HOME}"
 
 # Remove the existing scene collection so the latest settings are written cleanly
 if [[ -f "${SCENE_FILE}" ]]; then
@@ -176,7 +181,7 @@ Profile=${COLLECTION_NAME}
 Collection=${COLLECTION_NAME}
 GLOBAL
 run_as_streamer "touch '${GLOBAL_INI}'"  # Ensures ownership
-chown streamer:streamer "${GLOBAL_INI}"
+chown "${STREAM_USER}:${STREAM_GROUP}" "${GLOBAL_INI}"
 
 # Fixed scene JSON (hierarchical, with silent audio)
 cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
@@ -405,7 +410,7 @@ Track1Bitrate=${AUDIO_BITRATE}
 Projector=${STREAM_URL}
 Key=${YOUTUBE_STREAM_KEY}
 PROFILE
-chown -R streamer:streamer "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
+chown -R "${STREAM_USER}:${STREAM_GROUP}" "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}"
 
 cat > "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/service.json" << SERVICE
 {
@@ -417,7 +422,7 @@ cat > "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/service.json" << SERVICE
   }
 }
 SERVICE
-chown streamer:streamer "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/service.json"
+chown "${STREAM_USER}:${STREAM_GROUP}" "${CONFIG_ROOT}/basic/profiles/${COLLECTION_NAME}/service.json"
 
 # Registries
 cat << REGISTRY | run_as_streamer tee "${CONFIG_ROOT}/basic/scene_collections.json" >/dev/null
@@ -450,8 +455,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=streamer
+User=${STREAM_USER}
 WorkingDirectory=${APP_DIR}
+Group=${STREAM_GROUP}
 Environment=HOST=0.0.0.0
 Environment=PORT=3000
 Environment=NODE_ENV=production
@@ -473,9 +479,12 @@ Requires=react-web.service
 
 [Service]
 Type=simple
-User=streamer
-Group=streamer
-Environment=HOME=/var/lib/streamer
+User=${STREAM_USER}
+Group=${STREAM_GROUP}
+WorkingDirectory=${OBS_HOME}
+Environment=HOME=${OBS_HOME}
+Environment=XDG_CONFIG_HOME=${OBS_HOME}/.config
+Environment=XDG_CACHE_HOME=${OBS_HOME}/.cache
 Environment=DISPLAY=:99
 Environment=CEF_DISABLE_SANDBOX=1
 Environment=LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}

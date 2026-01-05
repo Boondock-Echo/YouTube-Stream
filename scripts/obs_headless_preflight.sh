@@ -7,10 +7,12 @@ set -euo pipefail
 # `basic_string: construction from null is not valid` when output settings are
 # missing.
 
-OBS_HOME=${OBS_HOME:-/var/lib/streamer}
+STREAM_USER=${STREAM_USER:-streamer}
+OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
+CONFIG_ROOT=${CONFIG_ROOT:-${OBS_HOME}/.config/obs-studio}
 COLLECTION_NAME=${COLLECTION_NAME:-YouTubeHeadless}
-SCENE_FILE="$OBS_HOME/.config/obs-studio/basic/scenes/${COLLECTION_NAME}.json"
-PROFILE_DIR="$OBS_HOME/.config/obs-studio/basic/profiles/${COLLECTION_NAME}"
+SCENE_FILE="$CONFIG_ROOT/basic/scenes/${COLLECTION_NAME}.json"
+PROFILE_DIR="$CONFIG_ROOT/basic/profiles/${COLLECTION_NAME}"
 SERVICE_FILE="$PROFILE_DIR/service.json"
 
 normalize_key() {
