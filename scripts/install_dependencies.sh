@@ -10,6 +10,27 @@ NODE_MAJOR=${NODE_MAJOR:-20}
 
 export DEBIAN_FRONTEND=${DEBIAN_FRONTEND:-noninteractive}
 
+install_optional_packages() {
+  local available=() missing=() pkg
+
+  for pkg in "$@"; do
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      available+=("$pkg")
+    else
+      missing+=("$pkg")
+    fi
+  done
+
+  if [[ ${#available[@]} -gt 0 ]]; then
+    echo "Installing optional OBS plugin packages: ${available[*]}"
+    apt-get install -y "${available[@]}"
+  fi
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "Optional OBS plugin packages not found in APT (browser/VLC sources may be unavailable): ${missing[*]}" >&2
+  fi
+}
+
 command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
@@ -41,6 +62,9 @@ if ! command_exists obs; then
   apt-get update
   apt-get install -y obs-studio
 fi
+
+# Ensure browser/vlc plugins are available for the generated scene collection
+install_optional_packages obs-plugins obs-plugins-browser obs-plugins-vlc obs-browser obs-vlc
 
 # Ensure the service user exists
 if ! id -u "$STREAM_USER" >/dev/null 2>&1; then
