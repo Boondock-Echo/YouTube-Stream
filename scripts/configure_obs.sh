@@ -91,13 +91,38 @@ if [[ "${ENABLE_BROWSER_SOURCE_HW_ACCEL}" != "0" && "${ENABLE_BROWSER_SOURCE_HW_
     exit 1
 fi
 
+# Validate friendly names and keys to avoid unexpected characters being written into OBS files
+validate_identifier() {
+    local label="$1" value="$2" pattern="$3" allowed_desc="$4"
+
+    if [[ -z "${value}" ]]; then
+        echo "Error: ${label} required." >&2
+        exit 1
+    fi
+    if [[ "${value}" =~ [[:cntrl:]] ]]; then
+        echo "Error: ${label} cannot contain control characters." >&2
+        exit 1
+    fi
+    if [[ ! "${value}" =~ ${pattern} ]]; then
+        echo "Error: ${label} contains unexpected characters. Allowed: ${allowed_desc}." >&2
+        exit 1
+    fi
+}
+
 # Prompt or load config
 if [[ -f "${CONFIG_JSON}" ]]; then
-    source <(jq -r 'to_entries|map("\(.key)=\(.value)")|join("\n")' "${CONFIG_JSON}")
+    echo "Loading OBS configuration from ${CONFIG_JSON}."
+    if ! CONFIG_EXPORTS="$(jq -r 'to_entries | map("\(.key)=\(.value|@sh)") | .[]' "${CONFIG_JSON}")"; then
+        echo "Error: Failed to parse ${CONFIG_JSON}." >&2
+        exit 1
+    fi
+    if [[ -n "${CONFIG_EXPORTS}" ]]; then
+        eval "${CONFIG_EXPORTS}"
+    fi
     SCENE_NAME="${SCENE_NAME:-${scene:-WebScene}}"
     SOURCE_NAME="${SOURCE_NAME:-${source:-BrowserSource}}"
     APP_URL="${APP_URL:-${url:-http://127.0.0.1:3000}}"
-    YOUTUBE_STREAM_KEY="${YOUTUBE_STREAM_KEY:-${key}}"
+    YOUTUBE_STREAM_KEY="${YOUTUBE_STREAM_KEY:-${STREAM_KEY:-${key}}}"
 else
     echo "=== Configuration Prompts ==="
     read -p "Scene name [WebScene]: " SCENE_NAME
@@ -124,10 +149,9 @@ if [[ -n "${APP_URL}" && ! "${APP_URL}" =~ ^https?:// ]]; then
 fi
 
 # Validate inputs
-if [[ -z "$YOUTUBE_STREAM_KEY" ]]; then
-    echo "Error: Stream key required." >&2
-    exit 1
-fi
+validate_identifier "SCENE_NAME" "${SCENE_NAME}" '^[A-Za-z0-9 _.-]+$' "letters, numbers, spaces, underscores, hyphens, and periods"
+validate_identifier "SOURCE_NAME" "${SOURCE_NAME}" '^[A-Za-z0-9 _.-]+$' "letters, numbers, spaces, underscores, hyphens, and periods"
+validate_identifier "YOUTUBE_STREAM_KEY" "${YOUTUBE_STREAM_KEY}" '^[A-Za-z0-9_-]+$' "letters, numbers, underscores, and hyphens"
 if ! [[ "$VIDEO_BASE_WIDTH" =~ ^[0-9]+$ && "$VIDEO_BASE_HEIGHT" =~ ^[0-9]+$ ]]; then
     echo "Error: VIDEO_BASE_WIDTH/VIDEO_BASE_HEIGHT must be integers." >&2
     exit 1
