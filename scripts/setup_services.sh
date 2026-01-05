@@ -64,6 +64,9 @@ echo "Installing dependencies and building React app at ${APP_DIR}..."
 sudo -u "${STREAM_USER}" HOME="${OBS_HOME}" bash -c "cd '${APP_DIR}' && npm install && npm run build"
 
 install -d -m 750 "$(dirname "$ENV_FILE")"
+# Install/update the preflight guard used by obs-headless.service
+install -m 755 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/obs_headless_preflight.sh" /usr/local/bin/obs-headless-preflight
+
 if [ ! -f "$ENV_FILE" ]; then
   cat <<ENV | tee "$ENV_FILE" >/dev/null
 # Insert your YouTube stream key and restart services after editing.
@@ -116,6 +119,7 @@ Environment=XDG_CONFIG_HOME=${OBS_HOME}/.config
 Environment=XDG_CACHE_HOME=${OBS_HOME}/.cache
 EnvironmentFile=${ENV_FILE}
 Environment=LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}
+ExecStartPre=/usr/local/bin/obs-headless-preflight
 ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x24 -ac +extension GLX +render -noreset" obs --collection YouTubeHeadless --profile YouTubeHeadless --scene WebScene --startstreaming --minimize-to-tray --disable-updater --disable-shutdown-check
 Restart=on-failure
 RestartSec=5
