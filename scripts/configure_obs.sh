@@ -159,6 +159,9 @@ echo "YOUTUBE_STREAM_KEY=${YOUTUBE_STREAM_KEY}" > "${ENV_FILE}"
 chmod 640 "${ENV_FILE}"
 chown root:root "${ENV_FILE}"
 
+# Install/update the preflight guard used by obs-headless.service
+install -m 755 "${SCRIPT_DIR}/obs_headless_preflight.sh" /usr/local/bin/obs-headless-preflight
+
 # Global.ini (browser source hardware acceleration configurable; defaults off)
 cat > "${GLOBAL_INI}" << GLOBAL
 [General]
@@ -476,6 +479,7 @@ Environment=HOME=/var/lib/streamer
 Environment=DISPLAY=:99
 Environment=CEF_DISABLE_SANDBOX=1
 Environment=LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}
+ExecStartPre=/usr/local/bin/obs-headless-preflight
 ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x24 -ac +extension GLX +render -noreset" obs --collection ${COLLECTION_NAME} --profile ${COLLECTION_NAME} --scene ${SCENE_NAME} --startstreaming
 Restart=always
 RestartSec=5
