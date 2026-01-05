@@ -24,7 +24,10 @@ LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
 
 # Helper: Run as streamer user
 run_as_streamer() {
-    sudo -u streamer HOME=/var/lib/streamer bash -c "$1"
+    # Use bash -lc with all arguments to preserve quoted strings and allow passing
+    # arbitrary commands (including those with pipes or redirection).
+    local cmd="$*"
+    sudo -u streamer HOME=/var/lib/streamer bash -lc "$cmd"
 }
 
 # Helper: Choose the best available hardware encoder (fallback to x264)
