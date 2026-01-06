@@ -157,7 +157,7 @@ if ! [[ "$VIDEO_BASE_WIDTH" =~ ^[0-9]+$ && "$VIDEO_BASE_HEIGHT" =~ ^[0-9]+$ ]]; 
     exit 1
 fi
 if [[ ! -f "${APP_DIR}/package.json" ]]; then
-    echo "Error: React app not found at ${APP_DIR}. Run scripts/bootstrap_react_app.sh first (or set APP_DIR)." >&2
+    echo "Error: React app not found at ${APP_DIR}. Run scripts/install/bootstrap_react_app.sh first (or set APP_DIR)." >&2
     exit 1
 fi
 

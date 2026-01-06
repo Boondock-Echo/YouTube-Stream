@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+
 APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
 STREAM_USER="${STREAM_USER:-streamer}"
 STREAM_GROUP="${STREAM_GROUP:-$STREAM_USER}"
@@ -49,7 +51,7 @@ configure_obs() {
   ENABLE_BROWSER_SOURCE_HW_ACCEL="$ENABLE_BROWSER_SOURCE_HW_ACCEL" \
   LIBGL_ALWAYS_SOFTWARE="$LIBGL_ALWAYS_SOFTWARE" \
   YOUTUBE_STREAM_KEY="$YOUTUBE_STREAM_KEY" \
-    bash /workspace/YouTube-Stream/scripts/configure_obs.sh "$hw_flag"
+    bash "${SCRIPT_ROOT}/config/configure_obs.sh" "$hw_flag"
 }
 
 start_react() {

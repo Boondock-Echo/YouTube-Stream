@@ -6,7 +6,7 @@ set -euo pipefail
 # which step in the setup is failing.
 #
 # Usage:
-#   sudo STREAM_USER=streamer APP_DIR=/opt/youtube-stream/webapp bash scripts/diagnostics.sh
+#   sudo STREAM_USER=streamer APP_DIR=/opt/youtube-stream/webapp bash scripts/ops/diagnostics.sh
 # Flags:
 #   --skip-systemd   Skip systemd unit checks (useful in containers without systemd)
 #   --skip-network   Skip the HTTP check against APP_URL
@@ -98,13 +98,13 @@ check_command() {
   if command -v "$cmd" >/dev/null 2>&1; then
     log_pass "$label present ($(command -v "$cmd"))"
   else
-    log_fail "$label missing (install_dependencies.sh should install it)"
+    log_fail "$label missing (scripts/install/install_dependencies.sh should install it)"
   fi
 }
 
 check_node_version() {
   if ! command -v node >/dev/null 2>&1; then
-    log_fail "Node.js not found (run scripts/install_dependencies.sh)"
+    log_fail "Node.js not found (run scripts/install/install_dependencies.sh)"
     return
   fi
   local required_major=20
@@ -190,7 +190,7 @@ check_user() {
     if id -u "$STREAM_USER" >/dev/null 2>&1; then
       log_pass "Service user ${STREAM_USER} exists"
     else
-      log_fail "Service user ${STREAM_USER} missing (install_dependencies.sh should create it)"
+      log_fail "Service user ${STREAM_USER} missing (scripts/install/install_dependencies.sh should create it)"
     fi
   else
     log_warn "Not running as root; skipping user existence check for ${STREAM_USER}"
@@ -281,7 +281,7 @@ check_app() {
   if [[ -f "$APP_DIR/package.json" ]]; then
     log_pass "React app found at $APP_DIR"
   else
-    log_fail "React app missing at $APP_DIR (run scripts/bootstrap_react_app.sh)"
+    log_fail "React app missing at $APP_DIR (run scripts/install/bootstrap_react_app.sh)"
     return
   fi
 
@@ -348,7 +348,7 @@ check_obs_config() {
   if [[ -d "$config_root" ]]; then
     log_pass "OBS config directory present at $config_root"
   else
-    log_fail "OBS config directory missing at $config_root (run scripts/configure_obs.sh)"
+    log_fail "OBS config directory missing at $config_root (run scripts/config/configure_obs.sh)"
     return
   fi
 
@@ -703,7 +703,7 @@ check_systemd_unit() {
   fi
 
   if ! systemctl list-unit-files "$unit" --no-legend 2>/dev/null | grep -q "$unit"; then
-    log_fail "$unit not registered (run scripts/setup_services.sh)"
+    log_fail "$unit not registered (run scripts/services/setup_services.sh)"
     return
   fi
 
