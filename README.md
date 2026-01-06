@@ -100,8 +100,27 @@ YOUTUBE_STREAM_KEY="YOUR_KEY" APP_URL=http://localhost:3000 \
   --minimize-to-tray --disable-updater --disable-shutdown-check
 ```
 
+### Docker (all-in-one) workflow
+The Docker image installs dependencies, builds the sample React app, provisions a virtual display, and launches OBS to capture the page.
+
+1. **Build the image (from repo root):**
+   ```bash
+   docker build -t youtube-stream .
+   ```
+2. **Run the container with your stream key (required) and port mapping:**
+   ```bash
+   docker run --rm -it \
+     -e YOUTUBE_STREAM_KEY="YOUR_YT_STREAM_KEY" \
+     -e APP_URL="http://localhost:3000" \
+     -p 3000:3000 \
+     youtube-stream
+   ```
+   - The React app is served on port `3000` inside the container and forwarded to the host.
+   - OBS starts in Xvfb and immediately streams the page at `APP_URL` to YouTube using `YOUTUBE_STREAM_KEY`.
+3. **Stop the container:** `Ctrl+C` or `docker stop <container>` (tini forwards signals so OBS shuts down cleanly).
+
 ### Container runtime variables
-When running the published container image, these environment variables tune runtime behavior:
+When running the container image, these environment variables tune runtime behavior:
 
 - `YOUTUBE_STREAM_KEY` (**required**) – RTMP key passed to OBS.
 - `APP_URL` (default `http://localhost:3000`) – URL loaded by the OBS browser source.

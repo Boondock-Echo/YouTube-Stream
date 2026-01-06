@@ -521,8 +521,11 @@ RestartSec=5
 WantedBy=multi-user.target
 SERVICE
 
-systemctl daemon-reload
-systemctl enable react-web.service obs-headless.service
-
-echo "Configuration complete! Run 'systemctl start react-web obs-headless' to stream."
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload
+    systemctl enable react-web.service obs-headless.service
+    echo "Configuration complete! Run 'systemctl start react-web obs-headless' to stream."
+else
+    echo "Configuration complete! systemd not detected; skipping service enablement (expected in containers)."
+fi
 echo "Verify: ./diagnostics.sh"
