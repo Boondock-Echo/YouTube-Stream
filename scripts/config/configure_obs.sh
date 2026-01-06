@@ -189,7 +189,17 @@ chmod 640 "${ENV_FILE}"
 chown root:root "${ENV_FILE}"
 
 # Install/update the preflight guard used by obs-headless.service
-install -m 755 "${SCRIPT_DIR}/obs_headless_preflight.sh" /usr/local/bin/obs-headless-preflight
+PREFLIGHT_SRC="${SCRIPT_DIR}/obs_headless_preflight.sh"
+if [[ ! -f "${PREFLIGHT_SRC}" ]]; then
+    PREFLIGHT_SRC="$(cd "${SCRIPT_DIR}/../services" && pwd)/obs_headless_preflight.sh"
+fi
+
+if [[ ! -f "${PREFLIGHT_SRC}" ]]; then
+    echo "Error: obs_headless_preflight.sh not found in ${SCRIPT_DIR} or ../services." >&2
+    exit 1
+fi
+
+install -m 755 "${PREFLIGHT_SRC}" /usr/local/bin/obs-headless-preflight
 
 # Global.ini (browser source hardware acceleration configurable; defaults off)
 cat > "${GLOBAL_INI}" << GLOBAL
