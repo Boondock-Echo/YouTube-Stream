@@ -516,7 +516,7 @@ EOF
 plugin_is_builtin() {
   local id="${1,,}"
   case "$id" in
-    ""|scene|group|transition|studio_mode|browser|audio_line|audio_input_capture|audio_output_capture|monitor_capture)
+    ""|scene|group|transition|studio_mode|browser|audio_line|audio_input_capture|audio_output_capture|monitor_capture|fade_transition|cut_transition|swipe_transition|slide_transition|stinger_transition|fade_to_color_transition|luma_wipe_transition)
       return 0
       ;;
     *)
@@ -562,6 +562,23 @@ is_plugin_installed() {
   done
 
   return 1
+}
+
+check_builtin_transitions() {
+  local builtin_transitions=(fade_transition cut_transition swipe_transition slide_transition stinger_transition fade_to_color_transition luma_wipe_transition)
+  local missing=()
+
+  for transition in "${builtin_transitions[@]}"; do
+    if ! plugin_is_builtin "$transition"; then
+      missing+=("$transition")
+    fi
+  done
+
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    log_pass "Built-in transition IDs recognized as internal: ${builtin_transitions[*]}"
+  else
+    log_warn "Expected built-in transition IDs were not recognized: ${missing[*]} (update plugin_is_builtin)"
+  fi
 }
 
 check_scene_plugins() {
@@ -631,6 +648,131 @@ check_scene_plugins() {
 
   if [[ $vlc_seen -eq 1 ]] && ! is_plugin_installed "vlc_source"; then
     log_fail "Scene references VLC sources but vlc-video plugin is not installed (install obs-vlc or obs-plugins-vlc package)."
+  fi
+}
+
+normalize_url() {
+  local url="$1"
+  # Trim surrounding whitespace and trailing slashes
+  url="${url#"${url%%[![:space:]]*}"}"
+  url="${url%"${url##*[![:space:]]}"}"
+  url="${url%/}"
+  printf '%s' "$url"
+}
+
+fetch_browser_url() {
+  local url="$1" label="$2"
+  if [[ "$SKIP_NETWORK" -eq 1 ]]; then
+    log_warn "Skipping browser source reachability check for ${label} due to --skip-network"
+    return
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    log_warn "curl not available; cannot verify ${label} reachability (${url})"
+    return
+  fi
+
+  local cmd=(curl -fsSL --max-time 8 "$url")
+  local run_as="current user"
+  if is_root && id -u "$STREAM_USER" >/dev/null 2>&1; then
+    cmd=(sudo -u "$STREAM_USER" "${cmd[@]}")
+    run_as="$STREAM_USER"
+  fi
+
+  local output status
+  set +e
+  output=$("${cmd[@]}" 2>/tmp/yt-stream-browser-check.err)
+  status=$?
+  set -e
+
+  local trimmed="${output//[[:space:]]/}"
+  if [[ $status -eq 0 && -n "$trimmed" ]]; then
+    log_pass "Browser source URL reachable for ${label} (${url}) as ${run_as}"
+  else
+    local err=""
+    if [[ -s /tmp/yt-stream-browser-check.err ]]; then
+      err=$(head -n 1 /tmp/yt-stream-browser-check.err)
+    fi
+    log_warn "Browser source URL unreachable or empty for ${label} (${url}) as ${run_as} (status=${status}${err:+; curl: $err})"
+  fi
+
+  rm -f /tmp/yt-stream-browser-check.err
+}
+
+check_browser_scene_target() {
+  if [[ -z "$SCENE_FILE" || ! -f "$SCENE_FILE" ]]; then
+    log_warn "Cannot validate browser source target; scene file missing (${SCENE_FILE:-unset})"
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    log_warn "jq not available; skipping browser source target validation"
+    return
+  fi
+
+  local expected_url expected_normalized
+  expected_url="${APP_URL:-http://localhost:3000}"
+  expected_normalized=$(normalize_url "$expected_url")
+  [[ -z "$expected_normalized" ]] && expected_normalized="http://localhost:3000"
+
+  local browser_entries
+  browser_entries=$(jq -r '
+    (.sources? // {} | to_entries[]
+     | select((.value.id // "") == "browser_source" or (.value.type // "") == "browser_source")
+     | "\(.key)|\(.value.name // .key)|\(.value.settings.url // "")")
+  ' "$SCENE_FILE" 2>/dev/null || true)
+
+  if [[ -z "$browser_entries" ]]; then
+    log_fail "No browser_source entries found in scene file ${SCENE_FILE} (expected a source pointing at the React app)"
+    return
+  fi
+
+  local matching=() mismatched=() missing_url=() urls=()
+  while IFS="|" read -r source_key source_name source_url; do
+    [[ -z "$source_key" ]] && continue
+    local normalized_url
+    normalized_url=$(normalize_url "$source_url")
+    urls+=("${source_name:-$source_key}:${normalized_url}")
+
+    if [[ -z "$normalized_url" ]]; then
+      missing_url+=("${source_name:-$source_key}")
+    elif [[ "$normalized_url" == "$expected_normalized" ]]; then
+      matching+=("${source_name:-$source_key}")
+    else
+      mismatched+=("${source_name:-$source_key} (${normalized_url})")
+    fi
+  done <<<"$browser_entries"
+
+  if [[ ${#missing_url[@]} -gt 0 ]]; then
+    log_fail "Browser source(s) missing URL in ${SCENE_FILE}: ${missing_url[*]}"
+  fi
+
+  if [[ ${#matching[@]} -gt 0 ]]; then
+    log_pass "Browser source URL matches expected React app (${expected_normalized}) for: ${matching[*]}"
+  else
+    log_fail "No browser sources point at expected React app URL (${expected_normalized}); found: ${urls[*]:-none}"
+  fi
+
+  if [[ ${#mismatched[@]} -gt 0 ]]; then
+    log_warn "Browser sources with unexpected URLs (expected ${expected_normalized}): ${mismatched[*]}"
+  fi
+
+  # Reachability check against the first available URL (prefer matched, otherwise first non-empty)
+  local probe_url probe_label
+  if [[ ${#matching[@]} -gt 0 ]]; then
+    probe_url="$expected_normalized"
+    probe_label="${matching[0]}"
+  else
+    # Use the first non-empty URL
+    for entry in "${urls[@]}"; do
+      probe_label="${entry%%:*}"
+      probe_url="${entry#*:}"
+      [[ -n "$probe_url" ]] && break
+    done
+  fi
+
+  if [[ -n "$probe_url" ]]; then
+    fetch_browser_url "$probe_url" "$probe_label"
   fi
 }
 
@@ -907,7 +1049,9 @@ main() {
   check_obs_installation
   describe_permissions
   check_obs_config
+  check_builtin_transitions
   check_scene_plugins
+  check_browser_scene_target
   run_obs_dry_run
   compare_stream_keys
 
