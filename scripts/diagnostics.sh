@@ -571,7 +571,7 @@ check_scene_plugins() {
     done <<<"$modules_required"
 
     if [[ ${#missing_modules[@]} -gt 0 ]]; then
-      log_warn "Scene modules listed in ${SCENE_FILE} not installed: ${missing_modules[*]}"
+      log_fail "Scene modules listed in ${SCENE_FILE} not installed: ${missing_modules[*]}"
     else
       log_pass "All scene-declared modules present"
     fi
@@ -603,17 +603,17 @@ check_scene_plugins() {
   done <<<"$scene_entries"
 
   if [[ ${#missing_plugins[@]} -gt 0 ]]; then
-    log_warn "Scene references missing or unknown plugin types: ${missing_plugins[*]}"
+    log_fail "Scene references missing or unknown plugin types: ${missing_plugins[*]}"
   else
     log_pass "All scene source ids/types appear to match installed plugins"
   fi
 
   if [[ $browser_seen -eq 1 ]] && ! is_plugin_installed "browser_source"; then
-    log_warn "Scene references browser sources but obs-browser plugin is not installed (install obs-browser or obs-plugins-browser package)."
+    log_fail "Scene references browser sources but obs-browser plugin is not installed (install obs-browser or obs-plugins-browser package)."
   fi
 
   if [[ $vlc_seen -eq 1 ]] && ! is_plugin_installed "vlc_source"; then
-    log_warn "Scene references VLC sources but vlc-video plugin is not installed (install obs-vlc or obs-plugins-vlc package)."
+    log_fail "Scene references VLC sources but vlc-video plugin is not installed (install obs-vlc or obs-plugins-vlc package)."
   fi
 }
 
@@ -659,11 +659,18 @@ run_obs_dry_run() {
     return
   fi
 
-  log_warn "OBS dry-run load failed (exit $status). Review $run_log for loader errors."
-  append_obs_log_note "$(cat <<EOF
-OBS dry-run load failed (exit $status). Check $run_log for parser/loader errors. Ensure plugins referenced in ${SCENE_FILE} are installed and the collection/profile names match (${COLLECTION_NAME}/${COLLECTION_NAME}).
-EOF
-)"
+  log_fail "OBS dry-run load failed (exit $status). Review $run_log for loader errors."
+  local run_log_tail=""
+  if [[ -s "$run_log" ]]; then
+    run_log_tail=$(tail -n 40 "$run_log" 2>/dev/null || true)
+  fi
+
+  local note="OBS dry-run load failed (exit $status). Check $run_log for parser/loader errors. Ensure plugins referenced in ${SCENE_FILE} are installed and the collection/profile names match (${COLLECTION_NAME}/${COLLECTION_NAME})."
+  if [[ -n "$run_log_tail" ]]; then
+    note+=$'\n--- Tail of dry-run log ---\n'"${run_log_tail}"$'\n------------------------'
+  fi
+
+  append_obs_log_note "$note"
 
   if find_latest_obs_log; then
     print_latest_obs_log_tail
