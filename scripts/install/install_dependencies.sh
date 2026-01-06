@@ -57,11 +57,26 @@ if ! command_exists node || ! node -e "process.exit(Number(process.versions.node
 fi
 
 # Install OBS Studio (with PPA on Ubuntu LTS machines)
-if ! command_exists obs; then
-  add-apt-repository -y ppa:obsproject/obs-studio
-  apt-get update
-  apt-get install -y obs-studio
-fi
+install_obs() {
+  if command_exists obs; then
+    return
+  fi
+
+  echo "Installing OBS Studio (attempting distro packages first, then OBS PPA)."
+  if ! apt-get install -y obs-studio; then
+    echo "OBS Studio not available from default repositories; adding PPA." >&2
+    add-apt-repository -y ppa:obsproject/obs-studio
+    apt-get update
+    apt-get install -y obs-studio
+  fi
+
+  if ! command_exists obs; then
+    echo "Error: obs-studio package did not install the 'obs' CLI into PATH." >&2
+    apt-cache policy obs-studio || true
+    exit 1
+  fi
+}
+install_obs
 
 # Ensure browser/vlc plugins are available for the generated scene collection
 install_optional_packages obs-plugins obs-plugins-browser obs-plugins-vlc obs-browser obs-vlc
