@@ -3,9 +3,10 @@ set -euo pipefail
 
 # Preflight guard for obs-headless.service
 # Ensures the OBS profile, scene collection, and stream key are present before
-# launching OBS with --startstreaming to avoid crashes like
-# `basic_string: construction from null is not valid` when output settings are
-# missing.
+# launching OBS with --startstreaming. When the service profile lacks a key but
+# YOUTUBE_STREAM_KEY is available, it injects the env key to avoid crashes like
+# `basic_string: construction from null is not valid` that occur when OBS starts
+# streaming with empty output settings.
 
 STREAM_USER=${STREAM_USER:-streamer}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
@@ -48,7 +49,20 @@ service_key=$(normalize_key "$(jq -r '.settings.key // empty' "$SERVICE_FILE" 2>
 service_server=$(jq -r '.settings.server // empty' "$SERVICE_FILE" 2>/dev/null || true)
 env_key=$(normalize_key "${YOUTUBE_STREAM_KEY:-}")
 
-if [[ -z "$service_key" && -z "$env_key" ]]; then
+if [[ -z "$service_key" && -n "$env_key" ]]; then
+  tmp_file="$(mktemp "${SERVICE_FILE}.XXXX")"
+  trap 'rm -f "$tmp_file"' EXIT
+  if jq --arg key "$env_key" '.settings.key = $key' "$SERVICE_FILE" >"$tmp_file"; then
+    mv "$tmp_file" "$SERVICE_FILE"
+    trap - EXIT
+    service_key="$env_key"
+    echo "[obs-headless-preflight] service.json key was empty; populated from YOUTUBE_STREAM_KEY."
+  else
+    fail "Failed to update stream key in $SERVICE_FILE (jq write error)."
+  fi
+fi
+
+if [[ -z "$service_key" ]]; then
   fail "Stream key missing (service.json empty and YOUTUBE_STREAM_KEY not provided)."
 fi
 
