@@ -100,6 +100,19 @@ YOUTUBE_STREAM_KEY="YOUR_KEY" APP_URL=http://localhost:3000 \
   --minimize-to-tray --disable-updater --disable-shutdown-check
 ```
 
+### Container runtime variables
+When running the published container image, these environment variables tune runtime behavior:
+
+- `YOUTUBE_STREAM_KEY` (**required**) – RTMP key passed to OBS.
+- `APP_URL` (default `http://localhost:3000`) – URL loaded by the OBS browser source.
+- `VIDEO_BASE_WIDTH` / `VIDEO_BASE_HEIGHT` (defaults `1024`/`576`) – Xvfb/OBS resolution for the virtual display.
+- `ENABLE_BROWSER_SOURCE_HW_ACCEL` (default `0`) – Enable (`1`) or disable (`0`) OBS browser source hardware acceleration.
+- `LIBGL_ALWAYS_SOFTWARE` (default `1`) – Forces software rendering when GPU acceleration is unreliable.
+- `STREAM_USER` / `OBS_HOME` (defaults `streamer`/`/var/lib/streamer`) – Service user and home used for OBS configs and logs.
+- `APP_DIR` (default `/opt/youtube-stream/webapp`) – React app path used by the entrypoint.
+
+The container exposes port `3000` and uses `tini` as PID 1 to forward signals to the React server and headless OBS process.
+
 ### Troubleshooting
 If `obs-headless.service` is running under a different user than `streamer`, OBS will place its config and logs under that user’s home (for example, `/var/lib/<user>/.config/obs-studio` and `/var/lib/<user>/logs/obs-studio`). Rerun `scripts/setup_services.sh` with `STREAM_USER=streamer OBS_HOME=/var/lib/streamer` to reset the unit to the default user/path before restarting the service.
 
