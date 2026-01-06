@@ -10,9 +10,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends sudo tini && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy scripts into the image
+# Copy the entire repository into the image so scripts and config stay self-contained
 WORKDIR /workspace/YouTube-Stream
-COPY scripts/ ./scripts/
+COPY . /workspace/YouTube-Stream/
 
 # Install Node/OBS/Xvfb and create the service user
 RUN chmod +x scripts/*.sh && \
@@ -23,9 +23,6 @@ RUN APP_DIR="$APP_DIR" STREAM_USER="$STREAM_USER" bash scripts/bootstrap_react_a
     su -p -s /bin/bash "$STREAM_USER" -c "cd \"$APP_DIR\" && npm run build"
 
 # Entrypoint to configure OBS and launch services
-COPY scripts/container-entrypoint.sh /scripts/container-entrypoint.sh
-RUN chmod +x /scripts/container-entrypoint.sh
-
 EXPOSE 3000
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/scripts/container-entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/workspace/YouTube-Stream/scripts/container-entrypoint.sh"]
