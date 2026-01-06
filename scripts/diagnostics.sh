@@ -637,10 +637,10 @@ run_obs_dry_run() {
   local cmd=(obs --collection "$COLLECTION_NAME" --profile "$COLLECTION_NAME" --scene "$SCENE_NAME" --unfiltered_log --disable-updater --disable-shutdown-check --minimize-to-tray --quit)
 
   if is_root && id -u "$STREAM_USER" >/dev/null 2>&1; then
-    cmd=(sudo -u "$STREAM_USER" HOME="$OBS_HOME" XDG_CONFIG_HOME="$OBS_HOME/.config" XDG_CACHE_HOME="$OBS_HOME/.cache" "${cmd[@]}")
+    cmd=(sudo -E -u "$STREAM_USER" HOME="$OBS_HOME" XDG_CONFIG_HOME="$OBS_HOME/.config" XDG_CACHE_HOME="$OBS_HOME/.cache" "${cmd[@]}")
   fi
 
-  cmd=(xvfb-run -a -s "-screen 0 1920x1080x24" "${cmd[@]}")
+  cmd=(xvfb-run -a -s "-screen 0 1920x1080x24 -ac +extension GLX +render -noreset" "${cmd[@]}")
 
   echo "Running OBS dry-run load to validate scene collection (logs: $run_log)"
   local status
