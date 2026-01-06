@@ -118,13 +118,30 @@ check_node_version() {
 }
 
 collect_obs_plugins() {
-  local -A seen
-  local modules=()
+  local -A seen dir_seen
+  local modules=() candidates=()
   INSTALLED_OBS_PLUGIN_DIRS=()
 
-  for dir in /usr/lib*/obs-plugins; do
+  # Common OBS plugin roots across distros (Debian/Ubuntu use multiarch paths).
+  candidates=(
+    /usr/lib/obs-plugins
+    /usr/lib64/obs-plugins
+    /usr/local/lib/obs-plugins
+    /usr/local/lib64/obs-plugins
+  )
+
+  # Discover additional obs-plugins directories within /usr/lib* (e.g. /usr/lib/x86_64-linux-gnu/obs-plugins).
+  while IFS= read -r -d '' found; do
+    candidates+=("$found")
+  done < <(find /usr/lib* -maxdepth 3 -type d -name obs-plugins -print0 2>/dev/null || true)
+
+  for dir in "${candidates[@]}"; do
     [[ -d "$dir" ]] || continue
-    INSTALLED_OBS_PLUGIN_DIRS+=("$dir")
+    if [[ -z "${dir_seen[$dir]:-}" ]]; then
+      dir_seen[$dir]=1
+      INSTALLED_OBS_PLUGIN_DIRS+=("$dir")
+    fi
+
     while IFS= read -r plugin; do
       [[ -z "$plugin" ]] && continue
       local base="${plugin%.so}"
