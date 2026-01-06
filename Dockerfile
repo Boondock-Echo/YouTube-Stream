@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Base tools needed before the helper scripts run
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends sudo tini && \
+    apt-get install -y --no-install-recommends sudo tini supervisor && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the entire repository into the image so scripts and config stay self-contained
