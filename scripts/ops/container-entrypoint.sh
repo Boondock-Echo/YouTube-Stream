@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+SUPERVISOR_CONF="${SCRIPT_ROOT}/config/supervisord.conf"
 
 APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
 STREAM_USER="${STREAM_USER:-streamer}"
@@ -14,6 +15,10 @@ VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-576}"
 ENABLE_BROWSER_SOURCE_HW_ACCEL="${ENABLE_BROWSER_SOURCE_HW_ACCEL:-0}"
 LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
 DISPLAY="${DISPLAY:-:99}"
+CEF_DISABLE_SANDBOX="${CEF_DISABLE_SANDBOX:-1}"
+
+export APP_DIR STREAM_USER STREAM_GROUP OBS_HOME APP_URL STREAM_URL VIDEO_BASE_WIDTH VIDEO_BASE_HEIGHT
+export ENABLE_BROWSER_SOURCE_HW_ACCEL LIBGL_ALWAYS_SOFTWARE DISPLAY CEF_DISABLE_SANDBOX YOUTUBE_STREAM_KEY
 
 require_var() {
   local name="$1"
@@ -30,8 +35,8 @@ ensure_permissions() {
   chown -R "$STREAM_USER:$STREAM_GROUP" "$APP_DIR" "$OBS_HOME"
 }
 
-run_as_streamer() {
-  su -p -s /bin/bash "$STREAM_USER" -c "$*"
+prepare_supervisor() {
+  mkdir -p /var/log/supervisor /var/run
 }
 
 configure_obs() {
@@ -54,38 +59,9 @@ configure_obs() {
     bash "${SCRIPT_ROOT}/config/configure_obs.sh" "$hw_flag"
 }
 
-start_react() {
-  run_as_streamer "cd \"$APP_DIR\" && npm install && npm run build && HOST=0.0.0.0 PORT=3000 npx --yes serve -s build -l tcp://0.0.0.0:3000" &
-  REACT_PID=$!
-  echo "React server started (pid=${REACT_PID})."
-}
-
-start_obs() {
-  local xvfb_opts="-screen 0 ${VIDEO_BASE_WIDTH}x${VIDEO_BASE_HEIGHT}x24 -ac +extension GLX +render -noreset"
-  run_as_streamer "HOME=\"$OBS_HOME\" XDG_CONFIG_HOME=\"$OBS_HOME/.config\" XDG_CACHE_HOME=\"$OBS_HOME/.cache\" DISPLAY=\"$DISPLAY\" CEF_DISABLE_SANDBOX=1 LIBGL_ALWAYS_SOFTWARE=\"$LIBGL_ALWAYS_SOFTWARE\" xvfb-run -a -s \"$xvfb_opts\" obs --collection YouTubeHeadless --profile YouTubeHeadless --scene WebScene --startstreaming" &
-  OBS_PID=$!
-  echo "OBS started (pid=${OBS_PID})."
-}
-
-shutdown() {
-  echo "Shutting down..."
-  if [[ -n "${OBS_PID:-}" ]]; then
-    kill "$OBS_PID" 2>/dev/null || true
-  fi
-  if [[ -n "${REACT_PID:-}" ]]; then
-    kill "$REACT_PID" 2>/dev/null || true
-  fi
-  wait
-}
-
 ensure_permissions
+prepare_supervisor
 configure_obs
-start_react
-start_obs
 
-trap shutdown TERM INT
-
-wait -n "$REACT_PID" "$OBS_PID"
-EXIT_CODE=$?
-shutdown
-exit "$EXIT_CODE"
+echo "Starting supervisord with ${SUPERVISOR_CONF}"
+exec /usr/bin/supervisord -c "$SUPERVISOR_CONF"
