@@ -46,12 +46,12 @@ apt-get install -y ca-certificates curl gnupg software-properties-common build-e
 
 # Install Node.js from NodeSource if missing or too old
 if ! command_exists node || ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= ${NODE_MAJOR} ? 0 : 1)"; then
-  NODE_KEYRING=/usr/share/keyrings/nodesource.gpg
+  NODE_KEYRING=/etc/apt/keyrings/nodesource.gpg
+  mkdir -p /etc/apt/keyrings
   if [ ! -f "$NODE_KEYRING" ]; then
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o "$NODE_KEYRING"
   fi
-  DISTRO_CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
-  echo "deb [signed-by=${NODE_KEYRING}] https://deb.nodesource.com/node_${NODE_MAJOR}.x ${DISTRO_CODENAME} main" > /etc/apt/sources.list.d/nodesource.list
+  echo "deb [signed-by=${NODE_KEYRING}] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list > /dev/null
   apt-get update
   apt-get install -y nodejs
 fi
