@@ -4,7 +4,27 @@ This repository provides install and runtime scripts to boot a headless Ubuntu s
 
 - Spins up a sample React web app (port `3000`).
 - Installs OBS Studio and configures it to stream the web page to YouTube via CLI.
-- Runs continuously with auto-restart via `systemd`.
+- Runs continuously with auto-restart via `systemd` or the container supervisor.
+
+## Repository layout
+
+The project is script-driven. Key entry points live under `scripts/`:
+
+- **Provisioning:**
+  - `install_dependencies.sh` — installs Node.js (20.x), OBS Studio, Xvfb, FFmpeg, and a dedicated `streamer` service user.
+  - `bootstrap_react_app.sh` — creates a sample React app under `/opt/youtube-stream/webapp` and prepares the UI.
+  - `configure_obs.sh` — writes an OBS profile/scene that captures `APP_URL`, sets your RTMP key, and installs the preflight guard; also seeds systemd units.
+- **Runtime:**
+  - `setup_services.sh` — builds the React app and creates/enables systemd units (`react-web.service`, `obs-headless.service`).
+  - `container-entrypoint.sh` — Docker entrypoint that builds/serves the React app and launches OBS inside Xvfb for containerized runs.
+  - `run-services.sh` — lightweight supervisor for non-systemd environments; starts the web app (dev or build) plus OBS and exits if either dies.
+- **Operations:**
+  - `diagnostics.sh` — sanity checks deps, OBS config, and service health.
+  - `fix_permissions.sh` / `reset_environment.sh` / `prepare_streamer.sh` / `backup.sh` — repair or reset the installation.
+  - `streamer_clone_repo.sh` — clones this repo as the `streamer` user to keep ownership consistent.
+  - `run_default_config.sh` — generates a throwaway OBS config with a placeholder stream key for local testing.
+
+The Dockerfile copies the repo into `/workspace/YouTube-Stream`, runs the provisioning scripts during build, and uses `tini` plus `container-entrypoint.sh` at runtime.
 
 ## Prerequisites
 - Ubuntu 20.04/22.04+ with sudo/root access.
