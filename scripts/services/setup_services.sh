@@ -20,7 +20,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 if [ ! -f "$APP_DIR/package.json" ]; then
-  echo "React app not found at $APP_DIR. Run scripts/bootstrap_react_app.sh first." >&2
+  echo "React app not found at $APP_DIR. Run scripts/install/bootstrap_react_app.sh first." >&2
   exit 1
 fi
 
@@ -55,7 +55,7 @@ preflight_misconfig_warnings() {
   fi
 
   if [[ ! -f "$service_file" ]]; then
-    echo "WARNING: OBS profile for ${COLLECTION_NAME} not found at ${service_file}. Run scripts/configure_obs.sh before starting obs-headless.service."
+    echo "WARNING: OBS profile for ${COLLECTION_NAME} not found at ${service_file}. Run scripts/config/configure_obs.sh before starting obs-headless.service."
   fi
 }
 

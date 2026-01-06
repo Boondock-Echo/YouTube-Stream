@@ -149,4 +149,4 @@ CSS
 
 sudo -u "$STREAM_USER" npm install --prefix "$APP_DIR"
 
-echo "React app ready at $APP_DIR. Use scripts/setup_services.sh to launch via systemd."
+echo "React app ready at $APP_DIR. Use scripts/services/setup_services.sh to launch via systemd."

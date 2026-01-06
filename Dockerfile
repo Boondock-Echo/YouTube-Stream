@@ -15,14 +15,14 @@ WORKDIR /workspace/YouTube-Stream
 COPY . /workspace/YouTube-Stream/
 
 # Install Node/OBS/Xvfb and create the service user
-RUN chmod +x scripts/*.sh && \
-    APP_DIR="$APP_DIR" STREAM_USER="$STREAM_USER" OBS_HOME="$OBS_HOME" bash scripts/install_dependencies.sh
+RUN find scripts -type f -name "*.sh" -exec chmod +x {} + && \
+    APP_DIR="$APP_DIR" STREAM_USER="$STREAM_USER" OBS_HOME="$OBS_HOME" bash scripts/install/install_dependencies.sh
 
 # Bootstrap and build the sample React app
-RUN APP_DIR="$APP_DIR" STREAM_USER="$STREAM_USER" bash scripts/bootstrap_react_app.sh && \
+RUN APP_DIR="$APP_DIR" STREAM_USER="$STREAM_USER" bash scripts/install/bootstrap_react_app.sh && \
     su -p -s /bin/bash "$STREAM_USER" -c "cd \"$APP_DIR\" && npm run build"
 
 # Entrypoint to configure OBS and launch services
 EXPOSE 3000
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/workspace/YouTube-Stream/scripts/container-entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/workspace/YouTube-Stream/scripts/ops/container-entrypoint.sh"]

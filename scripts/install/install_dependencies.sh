@@ -76,4 +76,4 @@ usermod -a -G video,audio,render "$STREAM_USER" 2>/dev/null || true
 mkdir -p "$OBS_HOME" "$OBS_HOME/.config/obs-studio" "$OBS_HOME/logs" "$APP_DIR"
 chown -R "$STREAM_USER":"$STREAM_USER" "$OBS_HOME" "$APP_DIR"
 
-echo "Dependencies installed. Proceed with scripts/bootstrap_react_app.sh and scripts/configure_obs.sh." 
+echo "Dependencies installed. Proceed with scripts/install/bootstrap_react_app.sh and scripts/config/configure_obs.sh."

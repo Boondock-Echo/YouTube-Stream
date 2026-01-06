@@ -18,7 +18,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 if ! id -u "$STREAM_USER" >/dev/null 2>&1; then
-  echo "Service user ${STREAM_USER} does not exist. Run install_dependencies.sh first." >&2
+  echo "Service user ${STREAM_USER} does not exist. Run scripts/install/install_dependencies.sh first." >&2
   exit 1
 fi
 

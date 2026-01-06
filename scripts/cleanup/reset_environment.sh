@@ -67,7 +67,7 @@ main() {
     systemctl daemon-reload || true
   fi
 
-  echo "Environment reset complete. Re-run install_dependencies.sh to reinstall requirements."
+  echo "Environment reset complete. Re-run scripts/install/install_dependencies.sh to reinstall requirements."
 }
 
 main "$@"

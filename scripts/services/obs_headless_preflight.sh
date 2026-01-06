@@ -39,11 +39,11 @@ fail() {
 }
 
 if ! command -v jq >/dev/null 2>&1; then
-  fail "jq is required (install_dependencies.sh installs it)."
+  fail "jq is required (scripts/install/install_dependencies.sh installs it)."
 fi
 
-[[ -f "$SCENE_FILE" ]] || fail "Scene collection missing at $SCENE_FILE (run scripts/configure_obs.sh)."
-[[ -f "$SERVICE_FILE" ]] || fail "OBS service configuration missing at $SERVICE_FILE (run scripts/configure_obs.sh)."
+[[ -f "$SCENE_FILE" ]] || fail "Scene collection missing at $SCENE_FILE (run scripts/config/configure_obs.sh)."
+[[ -f "$SERVICE_FILE" ]] || fail "OBS service configuration missing at $SERVICE_FILE (run scripts/config/configure_obs.sh)."
 
 service_key=$(normalize_key "$(jq -r '.settings.key // empty' "$SERVICE_FILE" 2>/dev/null || true)")
 service_server=$(jq -r '.settings.server // empty' "$SERVICE_FILE" 2>/dev/null || true)
