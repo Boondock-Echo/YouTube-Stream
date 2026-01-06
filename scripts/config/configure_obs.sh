@@ -214,8 +214,8 @@ CEFLogging=1
 Profile=${COLLECTION_NAME}
 Collection=${COLLECTION_NAME}
 GLOBAL
-run_as_streamer "touch '${GLOBAL_INI}'"  # Ensures ownership
 chown "${STREAM_USER}:${STREAM_GROUP}" "${GLOBAL_INI}"
+chmod 644 "${GLOBAL_INI}"
 
 # Fixed scene JSON (hierarchical, with silent audio)
 cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
