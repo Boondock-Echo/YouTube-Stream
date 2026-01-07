@@ -89,12 +89,12 @@ Wants=network-online.target
 Type=simple
 User=${STREAM_USER}
 WorkingDirectory=${APP_DIR}
-Environment=HOST=0.0.0.0
+Environment=HOST=127.0.0.1
 Environment=PORT=3000
 Environment=NODE_ENV=production
 ExecStartPre=/bin/bash -lc 'cd ${APP_DIR} && [ -d node_modules ] || npm install'
 ExecStartPre=/bin/bash -lc 'cd ${APP_DIR} && npm run build'
-ExecStart=/usr/bin/npx --yes serve -s build -l tcp://0.0.0.0:3000
+ExecStart=/usr/bin/npx --yes serve -s build -l tcp://127.0.0.1:3000
 Restart=on-failure
 RestartSec=5
 

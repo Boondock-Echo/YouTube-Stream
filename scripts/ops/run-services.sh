@@ -29,10 +29,10 @@ start_web() {
   local cmd
 
   if [[ -d "${APP_DIR}/build" ]]; then
-    cmd="cd ${APP_DIR} && exec serve -s build -l tcp://0.0.0.0:3000"
+    cmd="cd ${APP_DIR} && exec serve -s build -l tcp://127.0.0.1:3000"
     echo "Starting React production build from ${APP_DIR}/build"
   else
-    cmd="cd ${APP_DIR} && HOST=0.0.0.0 PORT=3000 BROWSER=none exec npm start"
+    cmd="cd ${APP_DIR} && HOST=127.0.0.1 PORT=3000 BROWSER=none exec npm start"
     echo "Starting React dev server from ${APP_DIR}"
   fi
 

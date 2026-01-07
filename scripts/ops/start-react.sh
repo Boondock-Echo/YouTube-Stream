@@ -10,4 +10,4 @@ cd "$APP_DIR"
 npm install
 npm run build
 
-HOST=0.0.0.0 PORT=3000 exec npx --yes serve -s build -l tcp://0.0.0.0:3000
+HOST=127.0.0.1 PORT=3000 exec npx --yes serve -s build -l tcp://127.0.0.1:3000
