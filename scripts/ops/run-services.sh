@@ -8,7 +8,7 @@ set -euo pipefail
 STREAM_USER="${STREAM_USER:-streamer}"
 OBS_HOME="${OBS_HOME:-/var/lib/${STREAM_USER}}"
 APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
-APP_URL="${APP_URL:-http://localhost:3000}"
+APP_URL="${APP_URL:-http://127.0.0.1:3000}"
 YOUTUBE_STREAM_KEY="${YOUTUBE_STREAM_KEY:-REPLACE_ME}"
 VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1024}"
 VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-576}"
@@ -29,10 +29,10 @@ start_web() {
   local cmd
 
   if [[ -d "${APP_DIR}/build" ]]; then
-    cmd="cd ${APP_DIR} && exec serve -s build -l tcp://0.0.0.0:3000"
+    cmd="cd ${APP_DIR} && exec serve -s build -l tcp://127.0.0.1:3000"
     echo "Starting React production build from ${APP_DIR}/build"
   else
-    cmd="cd ${APP_DIR} && HOST=0.0.0.0 PORT=3000 BROWSER=none exec npm start"
+    cmd="cd ${APP_DIR} && HOST=127.0.0.1 PORT=3000 BROWSER=none exec npm start"
     echo "Starting React dev server from ${APP_DIR}"
   fi
 

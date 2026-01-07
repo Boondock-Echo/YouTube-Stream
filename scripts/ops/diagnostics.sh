@@ -16,7 +16,7 @@ APP_DIR=${APP_DIR:-/opt/youtube-stream/webapp}
 STREAM_USER=${STREAM_USER:-streamer}
 OBS_HOME=${OBS_HOME:-/var/lib/${STREAM_USER}}
 ENV_FILE=${ENV_FILE:-/etc/youtube-stream/env}
-APP_URL=${APP_URL:-http://localhost:3000}
+APP_URL=${APP_URL:-http://127.0.0.1:3000}
 STREAM_URL=${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}
 COLLECTION_NAME=${COLLECTION_NAME:-YouTubeHeadless}
 SCENE_NAME=${SCENE_NAME:-WebScene}
@@ -711,9 +711,9 @@ check_browser_scene_target() {
   fi
 
   local expected_url expected_normalized
-  expected_url="${APP_URL:-http://localhost:3000}"
+  expected_url="${APP_URL:-http://127.0.0.1:3000}"
   expected_normalized=$(normalize_url "$expected_url")
-  [[ -z "$expected_normalized" ]] && expected_normalized="http://localhost:3000"
+  [[ -z "$expected_normalized" ]] && expected_normalized="http://127.0.0.1:3000"
 
   local browser_entries
   browser_entries=$(jq -r '

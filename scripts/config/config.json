@@ -6,5 +6,5 @@
   "SOURCE_NAME": "BrowserSource",
   "STREAM_KEY": "kdyd-zy0c-57zu-9evj-25wj",
   "STREAM_URL": "rtmp://a.rtmp.youtube.com/live2",
-  "APP_URL": "http://localhost:3000"
+  "APP_URL": "http://127.0.0.1:3000"
 }
