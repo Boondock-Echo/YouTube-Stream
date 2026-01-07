@@ -101,7 +101,7 @@ else
   default_stream_url=${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}
   prompt_for_value STREAM_URL "Enter the RTMP server URL" "$default_stream_url" true
 
-  default_app_url=${APP_URL:-http://localhost:3000}
+  default_app_url=${APP_URL:-http://127.0.0.1:3000}
   prompt_for_value APP_URL "Enter the app URL for the browser source" "$default_app_url" true
 
   prompt_for_value STREAM_KEY "Enter the YouTube stream key" "${STREAM_KEY:-}" true
