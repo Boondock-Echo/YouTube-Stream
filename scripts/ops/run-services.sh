@@ -8,7 +8,7 @@ set -euo pipefail
 STREAM_USER="${STREAM_USER:-streamer}"
 OBS_HOME="${OBS_HOME:-/var/lib/${STREAM_USER}}"
 APP_DIR="${APP_DIR:-/opt/youtube-stream/webapp}"
-APP_URL="${APP_URL:-http://localhost:3000}"
+APP_URL="${APP_URL:-http://127.0.0.1:3000}"
 YOUTUBE_STREAM_KEY="${YOUTUBE_STREAM_KEY:-REPLACE_ME}"
 VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1024}"
 VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-576}"

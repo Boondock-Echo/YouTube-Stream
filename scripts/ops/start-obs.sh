@@ -3,7 +3,7 @@ set -euo pipefail
 
 STREAM_USER="${STREAM_USER:-streamer}"
 OBS_HOME="${OBS_HOME:-/var/lib/${STREAM_USER}}"
-APP_URL="${APP_URL:-http://localhost:3000}"
+APP_URL="${APP_URL:-http://127.0.0.1:3000}"
 STREAM_URL="${STREAM_URL:-rtmp://a.rtmp.youtube.com/live2}"
 VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1024}"
 VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-576}"
