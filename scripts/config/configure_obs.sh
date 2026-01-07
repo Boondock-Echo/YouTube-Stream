@@ -189,13 +189,20 @@ chmod 640 "${ENV_FILE}"
 chown root:root "${ENV_FILE}"
 
 # Install/update the preflight guard used by obs-headless.service
-PREFLIGHT_SRC="${SCRIPT_DIR}/obs_headless_preflight.sh"
-if [[ ! -f "${PREFLIGHT_SRC}" ]]; then
-    PREFLIGHT_SRC="$(cd "${SCRIPT_DIR}/../services" && pwd)/obs_headless_preflight.sh"
-fi
+PREFLIGHT_SRC=""
+PREFLIGHT_CANDIDATES=(
+    "${SCRIPT_DIR}/obs_headless_preflight.sh"
+    "${SCRIPT_DIR}/../services/obs_headless_preflight.sh"
+)
+for candidate in "${PREFLIGHT_CANDIDATES[@]}"; do
+    if [[ -f "${candidate}" ]]; then
+        PREFLIGHT_SRC="${candidate}"
+        break
+    fi
+done
 
-if [[ ! -f "${PREFLIGHT_SRC}" ]]; then
-    echo "Error: obs_headless_preflight.sh not found in ${SCRIPT_DIR} or ../services." >&2
+if [[ -z "${PREFLIGHT_SRC}" ]]; then
+    echo "Error: obs_headless_preflight.sh not found. Tried: ${PREFLIGHT_CANDIDATES[*]}." >&2
     exit 1
 fi
 
