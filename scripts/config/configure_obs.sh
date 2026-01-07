@@ -282,8 +282,8 @@ cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
       "muted": false,
       "name": "${OVERLAY_TEXT_NAME}",
       "settings": {
-        "color1": 4294967295,
-        "color2": 4294967295,
+        "color1": 4294901760,
+        "color2": 4294901760,
         "custom_width": 1024,
         "drop_shadow": true,
         "drop_shadow_color": 4278190080,
@@ -301,6 +301,7 @@ cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
       },
       "sync": 0,
       "type": "text_ft2_source",
+      "versioned_id": "text_ft2_source_v2",
       "volume": 1
     },
     "${SCENE_NAME}": {
@@ -316,6 +317,22 @@ cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
       "name": "${SCENE_NAME}",
       "settings": {},
       "sources": [
+        {
+          "balance": 0,
+          "deinterlace_field_order": 0,
+          "deinterlace_mode": 0,
+          "enabled": true,
+          "flags": 0,
+          "hotkeys": {},
+          "id": "${OVERLAY_TEXT_NAME}",
+          "mixers": 0,
+          "muted": false,
+          "name": "${OVERLAY_TEXT_NAME}",
+          "settings": {},
+          "sync": 0,
+          "type": "text_ft2_source",
+          "volume": 1
+        },
         {
           "balance": 0,
           "deinterlace_field_order": 0,
