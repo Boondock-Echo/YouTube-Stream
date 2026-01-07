@@ -25,6 +25,8 @@ VIDEO_BASE_WIDTH="${VIDEO_BASE_WIDTH:-1024}"
 VIDEO_BASE_HEIGHT="${VIDEO_BASE_HEIGHT:-576}"
 ENABLE_BROWSER_SOURCE_HW_ACCEL="${ENABLE_BROWSER_SOURCE_HW_ACCEL:-0}"
 LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
+OVERLAY_TEXT_NAME="${OVERLAY_TEXT_NAME:-OverlayText}"
+OVERLAY_TEXT="${OVERLAY_TEXT:-Hello world}"
 
 # Helper: Run as streamer user
 run_as_streamer() {
@@ -151,6 +153,7 @@ fi
 # Validate inputs
 validate_identifier "SCENE_NAME" "${SCENE_NAME}" '^[A-Za-z0-9 _.-]+$' "letters, numbers, spaces, underscores, hyphens, and periods"
 validate_identifier "SOURCE_NAME" "${SOURCE_NAME}" '^[A-Za-z0-9 _.-]+$' "letters, numbers, spaces, underscores, hyphens, and periods"
+validate_identifier "OVERLAY_TEXT_NAME" "${OVERLAY_TEXT_NAME}" '^[A-Za-z0-9 _.-]+$' "letters, numbers, spaces, underscores, hyphens, and periods"
 validate_identifier "YOUTUBE_STREAM_KEY" "${YOUTUBE_STREAM_KEY}" '^[A-Za-z0-9_-]+$' "letters, numbers, underscores, and hyphens"
 if ! [[ "$VIDEO_BASE_WIDTH" =~ ^[0-9]+$ && "$VIDEO_BASE_HEIGHT" =~ ^[0-9]+$ ]]; then
     echo "Error: VIDEO_BASE_WIDTH/VIDEO_BASE_HEIGHT must be integers." >&2
@@ -267,6 +270,40 @@ cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
       "versioned_id": "browser_source_v2",
       "volume": 1
     },
+    "${OVERLAY_TEXT_NAME}": {
+      "balance": 0,
+      "deinterlace_field_order": 0,
+      "deinterlace_mode": 0,
+      "enabled": true,
+      "flags": 0,
+      "hotkeys": {},
+      "id": "text_ft2_source",
+      "mixers": 0,
+      "muted": false,
+      "name": "${OVERLAY_TEXT_NAME}",
+      "settings": {
+        "color1": 4294901760,
+        "color2": 4294901760,
+        "custom_width": 1024,
+        "drop_shadow": true,
+        "drop_shadow_color": 4278190080,
+        "drop_shadow_opacity": 255,
+        "drop_shadow_offset_x": 4,
+        "drop_shadow_offset_y": 4,
+        "font": {
+          "face": "DejaVu Sans",
+          "flags": 0,
+          "size": 48,
+          "style": "Regular"
+        },
+        "text": "${OVERLAY_TEXT}",
+        "word_wrap": false
+      },
+      "sync": 0,
+      "type": "text_ft2_source",
+      "versioned_id": "text_ft2_source_v2",
+      "volume": 1
+    },
     "${SCENE_NAME}": {
       "balance": 0,
       "deinterlace_field_order": 0,
@@ -280,6 +317,22 @@ cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
       "name": "${SCENE_NAME}",
       "settings": {},
       "sources": [
+        {
+          "balance": 0,
+          "deinterlace_field_order": 0,
+          "deinterlace_mode": 0,
+          "enabled": true,
+          "flags": 0,
+          "hotkeys": {},
+          "id": "${OVERLAY_TEXT_NAME}",
+          "mixers": 0,
+          "muted": false,
+          "name": "${OVERLAY_TEXT_NAME}",
+          "settings": {},
+          "sync": 0,
+          "type": "text_ft2_source",
+          "volume": 1
+        },
         {
           "balance": 0,
           "deinterlace_field_order": 0,
@@ -333,7 +386,7 @@ cat << SCENE | run_as_streamer tee "${SCENE_FILE}" >/dev/null
       "id": "fade_transition"
     }
   },
-  "uids": ["${SCENE_NAME}", "${SOURCE_NAME}", "SilenceAudio"],
+  "uids": ["${SCENE_NAME}", "${SOURCE_NAME}", "${OVERLAY_TEXT_NAME}", "SilenceAudio"],
   "version": 1
 }
 SCENE
