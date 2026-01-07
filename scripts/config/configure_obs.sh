@@ -346,7 +346,14 @@ fi
 ENCODER="$(select_encoder)"
 AUDIO_BITRATE="${AUDIO_BITRATE:-128}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-1000}"
+RECOMMENDED_VIDEO_BITRATE="${RECOMMENDED_VIDEO_BITRATE:-1000}"
 YOUTUBE_AUDIO_MIN=128
+
+# Enforce recommended baseline if caller provides a higher bitrate.
+if (( VIDEO_BITRATE > RECOMMENDED_VIDEO_BITRATE )); then
+    echo "Warning: VIDEO_BITRATE=${VIDEO_BITRATE}kbps exceeds the recommended ${RECOMMENDED_VIDEO_BITRATE}kbps; applying recommendation." >&2
+    VIDEO_BITRATE="${RECOMMENDED_VIDEO_BITRATE}"
+fi
 
 # Validate bitrate choices against YouTube's published guidance for common 30fps tiers
 validate_youtube_recommendations() {
