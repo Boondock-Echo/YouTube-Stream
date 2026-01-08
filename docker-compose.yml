@@ -1,0 +1,24 @@
+services:
+  web2yt:
+    build: .
+    container_name: web2yt
+    restart: unless-stopped
+    environment:
+      DISPLAY: ":99"
+      WIDTH: "1920"
+      HEIGHT: "1080"
+      FPS: "30"
+
+      # Set this to your transcription UI (or any webpage)
+      WEB_URL: "https://your-webpage.example.com"
+
+      # YouTube ingest + stream key
+      YT_RTMPS_URL: "rtmps://a.rtmps.youtube.com/live2"
+      YT_STREAM_KEY: "xxxx-xxxx-xxxx-xxxx"
+
+      # Encoding (tuned for 1080p30 with voice + animations)
+      VIDEO_BITRATE: "6500k"
+      VIDEO_MAXRATE: "7500k"
+      VIDEO_BUFSIZE: "13000k"
+      AUDIO_BITRATE: "160k"
+    shm_size: "1g"
