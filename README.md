@@ -18,6 +18,84 @@ If Docker is not installed, follow the official instructions for your OS:
 - Docker Engine: https://docs.docker.com/engine/install/
 - Docker Compose plugin: https://docs.docker.com/compose/install/
 
+### Ubuntu install checklist (22.04/24.04/25.04/25.10)
+Use the official Docker APT repository to install both Docker Engine and the Compose plugin.
+
+#### Prerequisites
+- Supported 64-bit Ubuntu versions: **Jammy 22.04 (LTS)**, **Noble 24.04 (LTS)**, **Plucky 25.04**, **Questing 25.10**
+- Supported architectures: `x86_64 (amd64)`, `armhf`, `arm64`, `s390x`, `ppc64le`
+- Firewall note: Docker bypasses `ufw`/`firewalld` for published ports and is only compatible with
+  `iptables-nft` or `iptables-legacy`. Use the **DOCKER-USER** chain for custom rules.
+
+#### Uninstall old versions (if present)
+```bash
+sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc | cut -f1)
+```
+This may report that none are installed, which is fine. Existing Docker data in `/var/lib/docker/` is not removed.
+
+#### Install Docker Engine + Compose plugin
+1) Add Docker’s official GPG key:
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+```
+
+2) Add the Docker APT repository:
+```bash
+sudo tee /etc/apt/sources.list.d/docker.sources <<'EOF'
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+sudo apt update
+```
+
+3) Install Docker packages:
+```bash
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+Optional: install a specific version instead of latest:
+```bash
+apt list --all-versions docker-ce
+VERSION_STRING=5:29.1.3-1~ubuntu.24.04~noble
+sudo apt install docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+#### Verify installation
+```bash
+sudo systemctl status docker
+```
+If not running:
+```bash
+sudo systemctl start docker
+```
+
+Test Docker Engine:
+```bash
+sudo docker run hello-world
+```
+
+Test Docker Compose:
+```bash
+docker compose version
+```
+
+#### Post-install (optional): run Docker without sudo
+```bash
+sudo groupadd docker
+sudo usermod -aG docker $USER
+```
+Log out/in (or run `newgrp docker`) to apply group changes, then test:
+```bash
+docker run hello-world
+```
+
 ## Quick start
 1) Clone or unzip this folder on the target machine.
 2) Edit `docker-compose.yml` and set:
