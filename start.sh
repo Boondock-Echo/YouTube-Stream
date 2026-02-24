@@ -96,11 +96,19 @@ done
 # 2) Virtual audio (PulseAudio)
 # -----------------------------
 log "Starting PulseAudio..."
-pulseaudio --daemonize=yes --log-level=warning --exit-idle-time=-1
+if pulseaudio --check >/dev/null 2>&1; then
+  log "PulseAudio daemon already running; reusing existing server."
+else
+  pulseaudio --daemonize=yes --log-level=warning --exit-idle-time=-1
+fi
 
 log "Creating virtual sink 'virtSink'..."
 # Sink where Chromium will play audio
-pactl load-module module-null-sink sink_name=virtSink sink_properties=device.description=virtSink >/dev/null
+if ! pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -Fxq "virtSink"; then
+  pactl load-module module-null-sink sink_name=virtSink sink_properties=device.description=virtSink >/dev/null
+else
+  log "PulseAudio sink 'virtSink' already exists; reusing."
+fi
 pactl set-default-sink virtSink
 
 # Capture source = sink monitor
