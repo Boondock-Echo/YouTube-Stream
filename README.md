@@ -130,7 +130,7 @@ You can adjust streaming quality or display settings via environment variables:
 | `WIDTH` | Capture width in pixels | `1920` |
 | `HEIGHT` | Capture height in pixels | `1080` |
 | `FPS` | Frames per second | `30` |
-| `CHROME_BIN` | Chromium executable inside container | `chromium` |
+| `CHROME_BIN` | Chromium executable inside container | `google-chrome` |
 | `VIDEO_BITRATE` | FFmpeg video bitrate | `6500k` |
 | `VIDEO_MAXRATE` | FFmpeg max bitrate | `7500k` |
 | `VIDEO_BUFSIZE` | FFmpeg buffer size | `13000k` |
@@ -177,10 +177,10 @@ If those fail, use one of these options:
 ### Chromium exits with "requires the chromium snap to be installed"
 This means the container is invoking Ubuntu's snap wrapper (`chromium-browser`) instead of a real Chromium binary.
 
-Use the apt `chromium` package in the image and set:
+Use the bundled `google-chrome-stable` package in the image. You can also set an explicit binary path/name with:
 ```yaml
 environment:
-  CHROME_BIN: "chromium"
+  CHROME_BIN: "google-chrome"
 ```
 
 The startup script now fails fast if Chromium exits immediately, so you will see an explicit error in logs instead of streaming a blank screen.
