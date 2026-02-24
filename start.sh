@@ -132,6 +132,8 @@ log "Launching Chromium kiosk with ${CHROMIUM_BIN} to ${WEB_URL} ..."
 # - --disable-dev-shm-usage is a fallback; shm_size is also set in compose
 "${CHROMIUM_BIN}" \
   --no-sandbox \
+  --no-first-run \
+  --no-default-browser-check \
   --disable-gpu \
   --disable-dev-shm-usage \
   --autoplay-policy=no-user-gesture-required \
