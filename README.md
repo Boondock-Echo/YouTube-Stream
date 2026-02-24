@@ -149,6 +149,15 @@ If you have an NVIDIA GPU and want NVENC, replace the FFmpeg encode line in `sta
 - Ensure `shm_size: "1g"` is present (it is by default).
 - Try lowering resolution or FPS temporarily to debug.
 
+### DBus errors in Chromium logs
+If you see repeated lines like `Failed to connect to socket /run/dbus/system_bus_socket`, the container is missing a running DBus system bus.
+
+Recent images start a lightweight system bus automatically before launching Chromium to reduce this log noise. If you still see it, rebuild and recreate the container so the latest image/script is running:
+```bash
+docker compose build --no-cache
+docker compose up -d --force-recreate
+```
+
 ### No audio
 - Ensure the webpage is actually playing audio (not muted).
 - Inside the container:
