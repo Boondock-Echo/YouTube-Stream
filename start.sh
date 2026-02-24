@@ -20,7 +20,7 @@ set -euo pipefail
 
 export DISPLAY
 
-log() { echo "[$(date -Is)] $*"; }
+log() { echo "[$(date -Is)] $*" >&2; }
 
 find_chromium_bin() {
   local candidate
@@ -77,8 +77,12 @@ check_web_url() {
 # 1) Virtual monitor (Xvfb)
 # -----------------------------
 log "Starting Xvfb on DISPLAY=${DISPLAY} (${WIDTH}x${HEIGHT})..."
-Xvfb "$DISPLAY" -screen 0 "${WIDTH}x${HEIGHT}x24" -nolisten tcp -ac &
-XVFB_PID=$!
+if xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
+  log "X display ${DISPLAY} is already active; reusing existing X server."
+else
+  Xvfb "$DISPLAY" -screen 0 "${WIDTH}x${HEIGHT}x24" -nolisten tcp -ac &
+  XVFB_PID=$!
+fi
 
 for i in {1..100}; do
   if xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
