@@ -130,6 +130,7 @@ You can adjust streaming quality or display settings via environment variables:
 | `WIDTH` | Capture width in pixels | `1920` |
 | `HEIGHT` | Capture height in pixels | `1080` |
 | `FPS` | Frames per second | `30` |
+| `CHROME_BIN` | Chromium executable inside container | `chromium` |
 | `VIDEO_BITRATE` | FFmpeg video bitrate | `6500k` |
 | `VIDEO_MAXRATE` | FFmpeg max bitrate | `7500k` |
 | `VIDEO_BUFSIZE` | FFmpeg buffer size | `13000k` |
@@ -155,6 +156,34 @@ If you have an NVIDIA GPU and want NVENC, replace the FFmpeg encode line in `sta
   pactl list short sinks
   pactl list short sources | grep virtSink.monitor
   ```
+
+### Hostname works on host, but blank page in stream
+If `WEB_URL` points to a hostname that only resolves on your host machine (for example `http://boondock-test:4000`), Chromium inside the container may not resolve or reach it.
+
+Check from inside the running container:
+```bash
+docker exec -it web2yt getent hosts boondock-test
+docker exec -it web2yt curl -I http://boondock-test:4000
+```
+
+If those fail, use one of these options:
+- Use `http://host.docker.internal:4000` and map host gateway in `docker-compose.yml`:
+  ```yaml
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  ```
+- Or publish your local service on an address reachable from the container network.
+
+### Chromium exits with "requires the chromium snap to be installed"
+This means the container is invoking Ubuntu's snap wrapper (`chromium-browser`) instead of a real Chromium binary.
+
+Use the apt `chromium` package in the image and set:
+```yaml
+environment:
+  CHROME_BIN: "chromium"
+```
+
+The startup script now fails fast if Chromium exits immediately, so you will see an explicit error in logs instead of streaming a blank screen.
 
 ### Black screen
 - Confirm Xvfb is running and `DISPLAY=:99`:
