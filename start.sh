@@ -49,6 +49,19 @@ url_host() {
   printf '%s' "$host"
 }
 
+
+start_system_dbus() {
+  # Chromium can spam DBus connection errors if no system bus exists in the container.
+  if [[ -S /run/dbus/system_bus_socket ]]; then
+    return 0
+  fi
+
+  if command -v dbus-daemon >/dev/null 2>&1; then
+    install -d /run/dbus
+    dbus-daemon --system --fork >/dev/null 2>&1 || true
+  fi
+}
+
 check_web_url() {
   local host
   host="$(url_host "$WEB_URL")"
@@ -118,6 +131,7 @@ AUDIO_SOURCE="virtSink.monitor"
 # 3) Chromium kiosk
 # -----------------------------
 check_web_url
+start_system_dbus
 
 CHROMIUM_BIN="$(find_chromium_bin || true)"
 if [[ -z "${CHROMIUM_BIN}" ]]; then
