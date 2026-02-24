@@ -27,8 +27,14 @@ find_chromium_bin() {
   for candidate in "${CHROME_BIN:-}" chromium chromium-browser google-chrome; do
     [ -n "$candidate" ] || continue
     if command -v "$candidate" >/dev/null 2>&1; then
-      printf '%s' "$candidate"
-      return 0
+      if "$candidate" --version >/tmp/chrome-version.txt 2>&1; then
+        printf '%s' "$candidate"
+        return 0
+      fi
+
+      if grep -q "requires the chromium snap to be installed" /tmp/chrome-version.txt 2>/dev/null; then
+        log "Skipping '${candidate}' because it is the Ubuntu snap wrapper, not a real Chromium binary."
+      fi
     fi
   done
   return 1
