@@ -11,11 +11,11 @@ services:
       CHROME_BIN: "chromium"
 
       # Set this to your transcription UI (or any webpage)
-      WEB_URL: "https://your-webpage.example.com"
+      WEB_URL: "http://boondock-test:4000"
 
       # YouTube ingest + stream key
       YT_RTMPS_URL: "rtmps://a.rtmps.youtube.com/live2"
-      YT_STREAM_KEY: "xxxx-xxxx-xxxx-xxxx"
+      YT_STREAM_KEY: "m8ef-j663-j7be-92s5-4gsd"
 
       # Encoding (tuned for 1080p30 with voice + animations)
       VIDEO_BITRATE: "6500k"
