@@ -8,6 +8,7 @@ services:
       WIDTH: "1920"
       HEIGHT: "1080"
       FPS: "30"
+      CHROME_BIN: "chromium"
 
       # Set this to your transcription UI (or any webpage)
       WEB_URL: "https://your-webpage.example.com"
@@ -22,3 +23,6 @@ services:
       VIDEO_BUFSIZE: "13000k"
       AUDIO_BITRATE: "160k"
     shm_size: "1g"
+    # Uncomment if WEB_URL points to a service running on the Docker host
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"

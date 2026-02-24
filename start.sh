@@ -22,6 +22,51 @@ export DISPLAY
 
 log() { echo "[$(date -Is)] $*"; }
 
+find_chromium_bin() {
+  local candidate
+  for candidate in "${CHROME_BIN:-}" chromium chromium-browser google-chrome; do
+    [ -n "$candidate" ] || continue
+    if command -v "$candidate" >/dev/null 2>&1; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+url_host() {
+  local url="$1"
+  local rest host
+  rest="${url#*://}"
+  host="${rest%%/*}"
+  host="${host%%:*}"
+  printf '%s' "$host"
+}
+
+check_web_url() {
+  local host
+  host="$(url_host "$WEB_URL")"
+
+  log "Preflight check for WEB_URL=${WEB_URL}"
+  if command -v getent >/dev/null 2>&1; then
+    if getent hosts "$host" >/dev/null 2>&1; then
+      log "DNS resolution OK for host '${host}'."
+    else
+      log "WARNING: DNS resolution failed for host '${host}'."
+      log "If this is a host-local service, try host.docker.internal or add an extra_hosts entry in docker-compose.yml."
+    fi
+  fi
+
+  if command -v curl >/dev/null 2>&1; then
+    if curl -fsSIL --max-time 10 "$WEB_URL" >/dev/null 2>&1; then
+      log "HTTP reachability check OK for ${WEB_URL}."
+    else
+      log "WARNING: Could not reach ${WEB_URL} with curl from inside the container."
+      log "Chromium may show a blank/error page if the URL is not reachable from container networking."
+    fi
+  fi
+}
+
 # -----------------------------
 # 1) Virtual monitor (Xvfb)
 # -----------------------------
@@ -54,12 +99,20 @@ AUDIO_SOURCE="virtSink.monitor"
 # -----------------------------
 # 3) Chromium kiosk
 # -----------------------------
-log "Launching Chromium kiosk to ${WEB_URL} ..."
+check_web_url
+
+CHROMIUM_BIN="$(find_chromium_bin || true)"
+if [[ -z "${CHROMIUM_BIN}" ]]; then
+  log "ERROR: Could not find a Chromium binary. Set CHROME_BIN or install chromium."
+  exit 1
+fi
+
+log "Launching Chromium kiosk with ${CHROMIUM_BIN} to ${WEB_URL} ..."
 # Notes:
 # - --autoplay-policy helps with pages that autoplay audio/video
 # - background throttling flags improve kiosk smoothness
 # - --disable-dev-shm-usage is a fallback; shm_size is also set in compose
-chromium-browser \
+"${CHROMIUM_BIN}" \
   --no-sandbox \
   --disable-gpu \
   --disable-dev-shm-usage \
@@ -76,6 +129,11 @@ CHROME_PID=$!
 
 # Give Chromium a moment to paint and start audio playback
 sleep 2
+if ! kill -0 "$CHROME_PID" >/dev/null 2>&1; then
+  log "ERROR: Chromium exited before capture started."
+  log "If you see a message about snap, install/use the apt chromium package and set CHROME_BIN=chromium."
+  exit 1
+fi
 
 # -----------------------------
 # 4) FFmpeg: capture X11 + PulseAudio -> YouTube RTMPS
