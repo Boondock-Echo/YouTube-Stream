@@ -222,6 +222,17 @@ environment:
 
 The startup script now fails fast if Chromium exits immediately, so you will see an explicit error in logs instead of streaming a blank screen.
 
+
+### Automated login fails with `ECONNREFUSED 127.0.0.1:9222`
+This indicates Puppeteer could not reach Chromium's DevTools endpoint in time.
+
+Checks:
+- Confirm Chromium is still running in the container (`docker exec -it web2yt pgrep -a chrome`).
+- Ensure no conflicting `DBUS_SESSION_BUS_ADDRESS` is injected from the environment. Invalid values can produce repeated DBus parse errors and unstable Chromium startup.
+- Increase `LOGIN_TIMEOUT_MS` for slower pages/hosts.
+
+Recent startup logic now waits for `http://127.0.0.1:${CHROME_DEBUG_PORT}/json/version` before attempting login, and logs a warning if the endpoint never becomes reachable.
+
 ### Black screen
 - Confirm Xvfb is running and `DISPLAY=:99`:
   ```bash
