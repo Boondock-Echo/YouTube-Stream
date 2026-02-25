@@ -145,6 +145,7 @@ You can adjust streaming quality or display settings via environment variables:
 | `LOGIN_SUCCESS_SELECTOR` | Optional selector that indicates login success | unset |
 | `CHROME_DEBUG_PORT` | Chromium remote debugging port for Puppeteer | `9222` |
 | `LOGIN_TIMEOUT_MS` | Login timeout in milliseconds | `30000` |
+| `LOGIN_DEBUG` | Enable verbose login automation logs (`1`/`true`) | `0` |
 
 
 ## Optional: automated login with Puppeteer
@@ -163,6 +164,32 @@ You can override selectors if your login form changes:
 - `LOGIN_SUCCESS_SELECTOR` (optional explicit post-login signal)
 
 > Security: avoid committing production credentials into source control.
+
+
+## Debugging automated login
+A lightweight local harness is included to validate login automation behavior without starting the full YouTube streaming stack.
+
+It exercises five fixture scenarios:
+- successful login in main DOM
+- delayed render of fields
+- iframe login form
+- wrong selector failure (and verifies debug artifacts are written)
+- cookie banner required
+
+Run it from this repository:
+```bash
+LOGIN_SCRIPT=./login.mjs scripts/test-login.sh
+```
+
+By default, the script expects a Chrome-compatible binary named `google-chrome` and the production path `/app/login.mjs` used inside the container image.
+For local runs, set `LOGIN_SCRIPT=./login.mjs` as shown above.
+
+Useful overrides:
+```bash
+CHROME_BIN=google-chrome-stable LOGIN_TIMEOUT_MS=12000 LOGIN_DEBUG=1 LOGIN_SCRIPT=./login.mjs scripts/test-login.sh
+```
+
+On expected failure scenarios, artifacts must exist at `/tmp/login-debug/failure.png` and `/tmp/login-debug/failure.html`.
 
 ## Tuning tips (1080p30 with voice + animations)
 Default settings are tuned for mixed motion UI + voice:

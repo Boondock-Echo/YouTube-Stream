@@ -5,5 +5,8 @@
   "type": "module",
   "dependencies": {
     "puppeteer-core": "^24.4.0"
+  },
+  "scripts": {
+    "test:login-harness": "scripts/test-login.sh"
   }
 }
