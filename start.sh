@@ -18,6 +18,9 @@ set -euo pipefail
 : "${VIDEO_BUFSIZE:=13000k}"
 : "${AUDIO_BITRATE:=160k}"
 
+: "${CHROME_DEBUG_PORT:=9222}"
+: "${LOGIN_TIMEOUT_MS:=30000}"
+
 export DISPLAY
 
 log() { echo "[$(date -Is)] $*" >&2; }
@@ -59,6 +62,23 @@ start_system_dbus() {
   if command -v dbus-daemon >/dev/null 2>&1; then
     install -d /run/dbus
     dbus-daemon --system --fork >/dev/null 2>&1 || true
+  fi
+}
+
+run_automated_login() {
+  if [[ -z "${LOGIN_USER:-}" || -z "${LOGIN_PASS:-}" ]]; then
+    log "LOGIN_USER/LOGIN_PASS not set; skipping automated login."
+    return 0
+  fi
+
+  if ! command -v node >/dev/null 2>&1; then
+    log "WARNING: Node.js is not available; skipping automated login."
+    return 0
+  fi
+
+  log "Running Puppeteer automated login..."
+  if ! node /app/login.mjs; then
+    log "WARNING: Automated login failed; continuing with currently visible page."
   fi
 }
 
@@ -158,6 +178,8 @@ log "Launching Chromium kiosk with ${CHROMIUM_BIN} to ${WEB_URL} ..."
   --window-size="${WIDTH},${HEIGHT}" \
   --start-fullscreen \
   --kiosk \
+  --remote-debugging-address=127.0.0.1 \
+  --remote-debugging-port="${CHROME_DEBUG_PORT}" \
   "$WEB_URL" &
 CHROME_PID=$!
 
@@ -168,6 +190,8 @@ if ! kill -0 "$CHROME_PID" >/dev/null 2>&1; then
   log "If you see a message about snap, install/use the apt chromium package and set CHROME_BIN=chromium."
   exit 1
 fi
+
+run_automated_login
 
 # -----------------------------
 # 4) FFmpeg: capture X11 + PulseAudio -> YouTube RTMPS

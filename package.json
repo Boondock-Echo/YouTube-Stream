@@ -1,0 +1,9 @@
+{
+  "name": "web2yt-login",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "puppeteer-core": "^24.4.0"
+  }
+}

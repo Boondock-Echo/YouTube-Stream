@@ -11,6 +11,8 @@ RUN apt-get update \
     fonts-dejavu-core \
     fonts-noto-color-emoji \
     gnupg \
+    nodejs \
+    npm \
     pulseaudio \
     tini \
     xvfb \
@@ -24,7 +26,10 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+COPY package.json package-lock.json /app/
+RUN npm ci --omit=dev
 COPY start.sh /app/start.sh
+COPY login.mjs /app/login.mjs
 RUN chmod +x /app/start.sh
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
