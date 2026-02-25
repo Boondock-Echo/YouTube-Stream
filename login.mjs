@@ -7,6 +7,7 @@ const {
   LOGIN_USER_SELECTOR = 'input[placeholder="User ID"], input[autocomplete="username"]',
   LOGIN_PASS_SELECTOR = 'input[placeholder="Password"], input[autocomplete="current-password"]',
   LOGIN_SUBMIT_SELECTOR = 'button[type="submit"]',
+  LOGIN_COOKIE_ACCEPT_SELECTOR = '',
   LOGIN_SUCCESS_SELECTOR = '',
   CHROME_DEBUG_PORT = '9222',
   LOGIN_TIMEOUT_MS = '30000'
@@ -24,6 +25,17 @@ const timeout = Number(LOGIN_TIMEOUT_MS) || 30000;
 const browserURL = `http://127.0.0.1:${CHROME_DEBUG_PORT}`;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const DEFAULT_COOKIE_ACCEPT_SELECTORS = [
+  '#onetrust-accept-btn-handler',
+  'button#accept-cookies',
+  'button[aria-label*="accept" i]',
+  'button[title*="accept" i]',
+  'button[data-testid*="accept" i]',
+  'button[class*="accept" i]',
+  'button[id*="accept" i]',
+  'button[name*="accept" i]',
+];
 
 async function connectWithRetry(retries = 30) {
   let lastErr;
@@ -46,16 +58,12 @@ try {
   }
 
   await page.goto(WEB_URL, { waitUntil: 'domcontentloaded', timeout });
+  await acceptCookies(page);
   await page.waitForSelector(LOGIN_USER_SELECTOR, { timeout });
   await page.waitForSelector(LOGIN_PASS_SELECTOR, { timeout });
 
-  await page.click(LOGIN_USER_SELECTOR, { clickCount: 3 });
-  await page.keyboard.press('Backspace');
-  await page.type(LOGIN_USER_SELECTOR, LOGIN_USER, { delay: 20 });
-
-  await page.click(LOGIN_PASS_SELECTOR, { clickCount: 3 });
-  await page.keyboard.press('Backspace');
-  await page.type(LOGIN_PASS_SELECTOR, LOGIN_PASS, { delay: 20 });
+  await fillInput(page, LOGIN_USER_SELECTOR, LOGIN_USER);
+  await fillInput(page, LOGIN_PASS_SELECTOR, LOGIN_PASS);
 
   if (LOGIN_SUBMIT_SELECTOR) {
     const submitButton = await page.$(LOGIN_SUBMIT_SELECTOR);
@@ -84,4 +92,46 @@ async function loginSuccessWait(page, waitTimeout) {
     return;
   }
   await page.waitForSelector(LOGIN_SUCCESS_SELECTOR, { timeout: waitTimeout });
+}
+
+async function fillInput(page, selector, value) {
+  await page.focus(selector);
+  await page.click(selector, { clickCount: 3 });
+  await page.keyboard.press('Backspace');
+  await page.type(selector, value, { delay: 20 });
+
+  await page.evaluate(
+    ({ inputSelector, inputValue }) => {
+      const input = document.querySelector(inputSelector);
+      if (!input) {
+        return;
+      }
+      input.value = inputValue;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+    { inputSelector: selector, inputValue: value }
+  );
+}
+
+async function acceptCookies(page) {
+  const selectors = [
+    ...(LOGIN_COOKIE_ACCEPT_SELECTOR ? [LOGIN_COOKIE_ACCEPT_SELECTOR] : []),
+    ...DEFAULT_COOKIE_ACCEPT_SELECTORS
+  ];
+
+  for (const selector of selectors) {
+    try {
+      const button = await page.$(selector);
+      if (!button) {
+        continue;
+      }
+      await button.click();
+      await sleep(500);
+      console.log(`[login] Accepted cookie banner using selector: ${selector}`);
+      return;
+    } catch {
+      // Try the next candidate selector.
+    }
+  }
 }
