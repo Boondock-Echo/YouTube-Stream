@@ -48,9 +48,10 @@ const DEFAULT_COOKIE_ACCEPT_SELECTORS = [
   'button[name*="accept" i]',
 ];
 
-async function connectWithRetry(retries = 30) {
+async function connectWithRetry(maxWaitMs) {
+  const attempts = Math.max(Math.ceil(maxWaitMs / 500), 20);
   let lastErr;
-  for (let i = 0; i < retries; i += 1) {
+  for (let i = 0; i < attempts; i += 1) {
     try {
       return await puppeteer.connect({ browserURL, defaultViewport: null });
     } catch (err) {
@@ -58,11 +59,15 @@ async function connectWithRetry(retries = 30) {
       await sleep(500);
     }
   }
-  throw lastErr;
+
+  const reason = lastErr?.cause?.code ?? lastErr?.message ?? 'unknown error';
+  throw new Error(
+    `[login] Could not connect to Chromium DevTools endpoint at ${browserURL} after ${attempts} attempts (~${Math.ceil((attempts * 500) / 1000)}s). Last error: ${reason}`
+  );
 }
 
 debugLog(`Connecting to browser at ${browserURL}`);
-const browser = await connectWithRetry();
+const browser = await connectWithRetry(timeout);
 try {
   let [page] = await browser.pages();
   if (!page) {
