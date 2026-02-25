@@ -87,12 +87,12 @@ try {
       const submitButtonMatch = await findSelectorInFrames(page, LOGIN_SUBMIT_SELECTOR, { timeout: 2000 });
       const submitButton = submitButtonMatch?.element;
       if (submitButton) {
-        await submitButton.click();
+        await clickElementMatch(submitButtonMatch, LOGIN_SUBMIT_SELECTOR);
       } else {
-        await page.keyboard.press('Enter');
+        await passFieldMatch.frame.keyboard.press('Enter');
       }
     } else {
-      await page.keyboard.press('Enter');
+      await passFieldMatch.frame.keyboard.press('Enter');
     }
 
     await loginSuccessWait(page, timeout, preSubmitUrl);
@@ -188,18 +188,18 @@ async function fillInput(fieldMatch, selector, value) {
   await frame.keyboard.press('Backspace');
   await element.type(value, { delay: 20 });
 
-  await frame.evaluate(
-    ({ inputSelector, inputValue }) => {
-      const input = document.querySelector(inputSelector);
-      if (!input) {
-        return;
-      }
-      input.value = inputValue;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    },
-    { inputSelector: selector, inputValue: value }
-  );
+  await element.evaluate((input, inputValue) => {
+    input.value = inputValue;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+
+  console.log(`[login] Filled selector "${selector}" in frame: ${frame.url() || '(no url)'}`);
+}
+
+async function clickElementMatch(elementMatch, selector) {
+  await elementMatch.element.click();
+  console.log(`[login] Clicked selector "${selector}" in frame: ${elementMatch.frame.url() || '(no url)'}`);
 }
 
 async function acceptCookies(page) {
@@ -215,7 +215,7 @@ async function acceptCookies(page) {
       if (!button) {
         continue;
       }
-      await button.click();
+      await clickElementMatch(buttonMatch, selector);
       await sleep(500);
       console.log(`[login] Accepted cookie banner using selector: ${selector}`);
       return;
