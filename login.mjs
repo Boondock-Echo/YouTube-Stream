@@ -199,17 +199,52 @@ async function fillInput(fieldMatch, selector, value) {
   await element.type(value, { delay: 20 });
 
   await element.evaluate((input, inputValue) => {
-    input.value = inputValue;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const prototype = Object.getPrototypeOf(input);
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+    if (descriptor?.set) {
+      descriptor.set.call(input, inputValue);
+    } else {
+      input.value = inputValue;
+    }
+
+    input.dispatchEvent(new InputEvent('input', { bubbles: true, data: inputValue }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.blur();
   }, value);
+
+  await sleep(100);
+
+  const finalValue = await element.evaluate((input) => input.value);
+  debugLog(`Selector "${selector}" final input value length: ${finalValue.length}`);
 
   console.log(`[login] Filled selector "${selector}" in frame: ${frame.url() || '(no url)'}`);
 }
 
 async function clickElementMatch(elementMatch, selector) {
-  await elementMatch.element.click();
-  console.log(`[login] Clicked selector "${selector}" in frame: ${elementMatch.frame.url() || '(no url)'}`);
+  const { frame, element } = elementMatch;
+
+  await element.click();
+
+  const triggeredFormSubmit = await element.evaluate((button) => {
+    const form = button.form || button.closest('form');
+    if (!form) {
+      return false;
+    }
+
+    if (typeof form.requestSubmit === 'function') {
+      form.requestSubmit(button);
+    } else {
+      form.submit();
+    }
+
+    return true;
+  });
+
+  if (triggeredFormSubmit) {
+    debugLog(`Triggered form submission from selector "${selector}" via form.requestSubmit/form.submit`);
+  }
+
+  console.log(`[login] Clicked selector "${selector}" in frame: ${frame.url() || '(no url)'}`);
 }
 
 async function acceptCookies(page) {
