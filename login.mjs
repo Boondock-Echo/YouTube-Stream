@@ -9,6 +9,7 @@ const {
   LOGIN_SUBMIT_SELECTOR = 'button[type="submit"]',
   LOGIN_COOKIE_ACCEPT_SELECTOR = '',
   LOGIN_SUCCESS_SELECTOR = '',
+  LOGIN_POST_SUBMIT_SELECTOR = '',
   CHROME_DEBUG_PORT = '9222',
   LOGIN_TIMEOUT_MS = '30000'
 } = process.env;
@@ -65,6 +66,8 @@ try {
   await fillInput(page, LOGIN_USER_SELECTOR, LOGIN_USER);
   await fillInput(page, LOGIN_PASS_SELECTOR, LOGIN_PASS);
 
+  const preSubmitUrl = page.url();
+
   if (LOGIN_SUBMIT_SELECTOR) {
     const submitButton = await page.$(LOGIN_SUBMIT_SELECTOR);
     if (submitButton) {
@@ -76,22 +79,69 @@ try {
     await page.keyboard.press('Enter');
   }
 
-  await Promise.race([
-    page.waitForNavigation({ waitUntil: 'networkidle2', timeout }).catch(() => null),
-    loginSuccessWait(page, timeout)
-  ]);
+  await loginSuccessWait(page, timeout, preSubmitUrl);
 
   console.log('[login] Automated login flow completed.');
 } finally {
   await browser.disconnect();
 }
 
-async function loginSuccessWait(page, waitTimeout) {
-  if (!LOGIN_SUCCESS_SELECTOR) {
-    await sleep(2000);
-    return;
+async function loginSuccessWait(page, waitTimeout, preSubmitUrl) {
+  const attemptedChecks = [];
+  const successChecks = [];
+
+  if (LOGIN_SUCCESS_SELECTOR) {
+    attemptedChecks.push(`LOGIN_SUCCESS_SELECTOR (${LOGIN_SUCCESS_SELECTOR}) visible`);
+    successChecks.push(
+      page
+        .waitForSelector(LOGIN_SUCCESS_SELECTOR, { timeout: waitTimeout })
+        .then(() => `LOGIN_SUCCESS_SELECTOR matched (${LOGIN_SUCCESS_SELECTOR})`)
+    );
+  } else {
+    attemptedChecks.push(`URL changed from pre-submit URL (${preSubmitUrl})`);
+    successChecks.push(
+      page
+        .waitForFunction((originalUrl) => window.location.href !== originalUrl, { timeout: waitTimeout }, preSubmitUrl)
+        .then(() => `URL changed from ${preSubmitUrl}`)
+    );
+
+    attemptedChecks.push(`password field disappeared (${LOGIN_PASS_SELECTOR})`);
+    successChecks.push(
+      page
+        .waitForFunction(
+          (passwordSelector) => !document.querySelector(passwordSelector),
+          { timeout: waitTimeout },
+          LOGIN_PASS_SELECTOR
+        )
+        .then(() => `Password field disappeared (${LOGIN_PASS_SELECTOR})`)
+    );
+
+    if (LOGIN_POST_SUBMIT_SELECTOR) {
+      attemptedChecks.push(`LOGIN_POST_SUBMIT_SELECTOR (${LOGIN_POST_SUBMIT_SELECTOR}) visible`);
+      successChecks.push(
+        page
+          .waitForSelector(LOGIN_POST_SUBMIT_SELECTOR, { timeout: waitTimeout })
+          .then(() => `LOGIN_POST_SUBMIT_SELECTOR matched (${LOGIN_POST_SUBMIT_SELECTOR})`)
+      );
+    }
   }
-  await page.waitForSelector(LOGIN_SUCCESS_SELECTOR, { timeout: waitTimeout });
+
+  try {
+    const successReason = await Promise.any(successChecks);
+    console.log(`[login] Login verification succeeded: ${successReason}`);
+  } catch {
+    const currentUrl = page.url();
+    let currentTitle = '(unavailable)';
+    try {
+      currentTitle = await page.title();
+    } catch {
+      // title may be unavailable if page context is gone.
+    }
+
+    throw new Error(
+      `[login] Login verification failed. URL="${currentUrl}" title="${currentTitle}" attemptedChecks=${attemptedChecks.join('; ')}`
+    );
+  }
 }
 
 async function fillInput(page, selector, value) {
