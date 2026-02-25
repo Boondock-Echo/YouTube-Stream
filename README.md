@@ -141,6 +141,7 @@ You can adjust streaming quality or display settings via environment variables:
 | `LOGIN_USER_SELECTOR` | CSS selector for username input | `input[placeholder="User ID"], input[autocomplete="username"]` |
 | `LOGIN_PASS_SELECTOR` | CSS selector for password input | `input[placeholder="Password"], input[autocomplete="current-password"]` |
 | `LOGIN_SUBMIT_SELECTOR` | CSS selector for submit button | `button[type="submit"]` |
+| `LOGIN_COOKIE_ACCEPT_SELECTOR` | Optional CSS selector for cookie-consent accept button | unset |
 | `LOGIN_SUCCESS_SELECTOR` | Optional selector that indicates login success | unset |
 | `CHROME_DEBUG_PORT` | Chromium remote debugging port for Puppeteer | `9222` |
 | `LOGIN_TIMEOUT_MS` | Login timeout in milliseconds | `30000` |
@@ -151,12 +152,14 @@ If your page requires credentials, set `LOGIN_USER` and `LOGIN_PASS` in `docker-
 When both are set, startup runs Puppeteer against the already-open Chromium session to:
 - wait for the login form
 - type username/password
+- accept a cookie banner when detected (or via an explicit selector)
 - press Enter
 
 You can override selectors if your login form changes:
 - `LOGIN_USER_SELECTOR`
 - `LOGIN_PASS_SELECTOR`
 - `LOGIN_SUBMIT_SELECTOR`
+- `LOGIN_COOKIE_ACCEPT_SELECTOR` (optional explicit cookie-accept button)
 - `LOGIN_SUCCESS_SELECTOR` (optional explicit post-login signal)
 
 > Security: avoid committing production credentials into source control.
