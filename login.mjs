@@ -1,4 +1,6 @@
 import puppeteer from 'puppeteer-core';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 const {
   WEB_URL,
@@ -24,6 +26,7 @@ if (!LOGIN_USER || !LOGIN_PASS) {
 
 const timeout = Number(LOGIN_TIMEOUT_MS) || 30000;
 const browserURL = `http://127.0.0.1:${CHROME_DEBUG_PORT}`;
+const DEBUG_ARTIFACT_DIR = '/tmp/login-debug';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -58,30 +61,70 @@ try {
     page = await browser.newPage();
   }
 
-  await page.goto(WEB_URL, { waitUntil: 'domcontentloaded', timeout });
-  await acceptCookies(page);
-  await page.waitForSelector(LOGIN_USER_SELECTOR, { timeout });
-  await page.waitForSelector(LOGIN_PASS_SELECTOR, { timeout });
+  page.on('console', (msg) => {
+    console.log(`[login][page-console][${msg.type()}] ${msg.text()}`);
+  });
+  page.on('pageerror', (err) => {
+    console.error(`[login][pageerror] ${err.message}`);
+  });
+  page.on('requestfailed', (request) => {
+    const failureText = request.failure()?.errorText ?? 'unknown';
+    console.error(`[login][requestfailed] ${request.method()} ${request.url()} (${failureText})`);
+  });
 
-  await fillInput(page, LOGIN_USER_SELECTOR, LOGIN_USER);
-  await fillInput(page, LOGIN_PASS_SELECTOR, LOGIN_PASS);
+  try {
+    await page.goto(WEB_URL, { waitUntil: 'domcontentloaded', timeout });
+    await acceptCookies(page);
+    await page.waitForSelector(LOGIN_USER_SELECTOR, { timeout });
+    await page.waitForSelector(LOGIN_PASS_SELECTOR, { timeout });
 
-  const preSubmitUrl = page.url();
+    await fillInput(page, LOGIN_USER_SELECTOR, LOGIN_USER);
+    await fillInput(page, LOGIN_PASS_SELECTOR, LOGIN_PASS);
 
-  if (LOGIN_SUBMIT_SELECTOR) {
-    const submitButton = await page.$(LOGIN_SUBMIT_SELECTOR);
-    if (submitButton) {
-      await submitButton.click();
+    const preSubmitUrl = page.url();
+
+    if (LOGIN_SUBMIT_SELECTOR) {
+      const submitButton = await page.$(LOGIN_SUBMIT_SELECTOR);
+      if (submitButton) {
+        await submitButton.click();
+      } else {
+        await page.keyboard.press('Enter');
+      }
     } else {
       await page.keyboard.press('Enter');
     }
-  } else {
-    await page.keyboard.press('Enter');
+
+    await loginSuccessWait(page, timeout, preSubmitUrl);
+
+    console.log('[login] Automated login flow completed.');
+  } catch (err) {
+    const currentUrl = page.url();
+    let currentTitle = '(unavailable)';
+    try {
+      currentTitle = await page.title();
+    } catch {
+      // title may be unavailable if page context is gone.
+    }
+
+    console.error(`[login] Failed at URL="${currentUrl}" title="${currentTitle}"`);
+    console.error(
+      `[login] Selectors: LOGIN_USER_SELECTOR="${LOGIN_USER_SELECTOR}" LOGIN_PASS_SELECTOR="${LOGIN_PASS_SELECTOR}" LOGIN_SUBMIT_SELECTOR="${LOGIN_SUBMIT_SELECTOR}" LOGIN_SUCCESS_SELECTOR="${LOGIN_SUCCESS_SELECTOR}"`
+    );
+
+    try {
+      await mkdir(DEBUG_ARTIFACT_DIR, { recursive: true });
+      const screenshotPath = path.join(DEBUG_ARTIFACT_DIR, 'failure.png');
+      const htmlPath = path.join(DEBUG_ARTIFACT_DIR, 'failure.html');
+
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      await writeFile(htmlPath, await page.content(), 'utf-8');
+      console.error(`[login] Saved failure artifacts: ${screenshotPath}, ${htmlPath}`);
+    } catch (artifactErr) {
+      console.error(`[login] Failed to save debug artifacts: ${artifactErr.message}`);
+    }
+
+    throw err;
   }
-
-  await loginSuccessWait(page, timeout, preSubmitUrl);
-
-  console.log('[login] Automated login flow completed.');
 } finally {
   await browser.disconnect();
 }
