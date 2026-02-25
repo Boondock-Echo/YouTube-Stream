@@ -13,7 +13,8 @@ const {
   LOGIN_SUCCESS_SELECTOR = '',
   LOGIN_POST_SUBMIT_SELECTOR = '',
   CHROME_DEBUG_PORT = '9222',
-  LOGIN_TIMEOUT_MS = '30000'
+  LOGIN_TIMEOUT_MS = '30000',
+  LOGIN_DEBUG = '0'
 } = process.env;
 
 if (!WEB_URL) {
@@ -29,6 +30,12 @@ const browserURL = `http://127.0.0.1:${CHROME_DEBUG_PORT}`;
 const DEBUG_ARTIFACT_DIR = '/tmp/login-debug';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const isDebugEnabled = LOGIN_DEBUG === '1' || LOGIN_DEBUG?.toLowerCase?.() === 'true';
+const debugLog = (message) => {
+  if (isDebugEnabled) {
+    console.log(`[login][debug] ${message}`);
+  }
+};
 
 const DEFAULT_COOKIE_ACCEPT_SELECTORS = [
   '#onetrust-accept-btn-handler',
@@ -54,6 +61,7 @@ async function connectWithRetry(retries = 30) {
   throw lastErr;
 }
 
+debugLog(`Connecting to browser at ${browserURL}`);
 const browser = await connectWithRetry();
 try {
   let [page] = await browser.pages();
@@ -73,6 +81,7 @@ try {
   });
 
   try {
+    debugLog(`Navigating to ${WEB_URL} with timeout ${timeout}ms`);
     await page.goto(WEB_URL, { waitUntil: 'domcontentloaded', timeout });
     await acceptCookies(page);
     const userFieldMatch = await waitForSelectorInFrames(page, LOGIN_USER_SELECTOR, { timeout });
@@ -96,6 +105,7 @@ try {
     }
 
     await loginSuccessWait(page, timeout, preSubmitUrl);
+    debugLog(`Post-login URL: ${page.url()}`);
 
     console.log('[login] Automated login flow completed.');
   } catch (err) {
@@ -248,6 +258,7 @@ async function findSelectorInFrames(page, selector, { timeout }) {
         // Ignore detached frame errors and continue polling.
       }
     }
+    debugLog(`Waiting for selector "${selector}" across ${page.frames().length} frame(s)`);
     await sleep(200);
   }
 
@@ -275,6 +286,8 @@ async function waitForSelectorToDisappearInFrames(page, selector, timeout) {
       return;
     }
 
+    debugLog(`Waiting for selector "${selector}" across ${page.frames().length} frame(s)`);
+    debugLog(`Selector "${selector}" still present in one or more frames`);
     await sleep(200);
   }
 
