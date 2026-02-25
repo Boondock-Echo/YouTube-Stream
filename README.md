@@ -7,6 +7,7 @@ captures **video + webpage audio**, and streams it to **YouTube Live** via **RTM
 - `docker-compose.yml` — service definition and environment variables
 - `Dockerfile` — container build instructions
 - `start.sh` — starts Xvfb + PulseAudio + Chromium + FFmpeg
+- `login.mjs` — optional Puppeteer automation for username/password login
 
 ## Prerequisites
 - Docker Engine
@@ -135,6 +136,30 @@ You can adjust streaming quality or display settings via environment variables:
 | `VIDEO_MAXRATE` | FFmpeg max bitrate | `7500k` |
 | `VIDEO_BUFSIZE` | FFmpeg buffer size | `13000k` |
 | `AUDIO_BITRATE` | FFmpeg audio bitrate | `160k` |
+| `LOGIN_USER` | Optional username for Puppeteer login | unset |
+| `LOGIN_PASS` | Optional password for Puppeteer login | unset |
+| `LOGIN_USER_SELECTOR` | CSS selector for username input | `input[placeholder="User ID"], input[autocomplete="username"]` |
+| `LOGIN_PASS_SELECTOR` | CSS selector for password input | `input[placeholder="Password"], input[autocomplete="current-password"]` |
+| `LOGIN_SUBMIT_SELECTOR` | CSS selector for submit button | `button[type="submit"]` |
+| `LOGIN_SUCCESS_SELECTOR` | Optional selector that indicates login success | unset |
+| `CHROME_DEBUG_PORT` | Chromium remote debugging port for Puppeteer | `9222` |
+| `LOGIN_TIMEOUT_MS` | Login timeout in milliseconds | `30000` |
+
+
+## Optional: automated login with Puppeteer
+If your page requires credentials, set `LOGIN_USER` and `LOGIN_PASS` in `docker-compose.yml`.
+When both are set, startup runs Puppeteer against the already-open Chromium session to:
+- wait for the login form
+- type username/password
+- press Enter
+
+You can override selectors if your login form changes:
+- `LOGIN_USER_SELECTOR`
+- `LOGIN_PASS_SELECTOR`
+- `LOGIN_SUBMIT_SELECTOR`
+- `LOGIN_SUCCESS_SELECTOR` (optional explicit post-login signal)
+
+> Security: avoid committing production credentials into source control.
 
 ## Tuning tips (1080p30 with voice + animations)
 Default settings are tuned for mixed motion UI + voice:

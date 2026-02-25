@@ -22,6 +22,13 @@ services:
       VIDEO_MAXRATE: "7500k"
       VIDEO_BUFSIZE: "13000k"
       AUDIO_BITRATE: "160k"
+      # Optional Puppeteer login automation
+      LOGIN_USER: "admin@boondock.cloud"
+      LOGIN_PASS: "B00nd0ck@Ech0"
+      LOGIN_USER_SELECTOR: "input[placeholder='User ID'], input[autocomplete='username']"
+      LOGIN_PASS_SELECTOR: "input[placeholder='Password'], input[autocomplete='current-password']"
+      LOGIN_SUBMIT_SELECTOR: "button[type='submit']"
+      # LOGIN_SUCCESS_SELECTOR: ".your-post-login-selector"
     shm_size: "1g"
     # Uncomment if WEB_URL points to a service running on the Docker host
     # extra_hosts:
