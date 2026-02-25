@@ -75,16 +75,17 @@ try {
   try {
     await page.goto(WEB_URL, { waitUntil: 'domcontentloaded', timeout });
     await acceptCookies(page);
-    await page.waitForSelector(LOGIN_USER_SELECTOR, { timeout });
-    await page.waitForSelector(LOGIN_PASS_SELECTOR, { timeout });
+    const userFieldMatch = await waitForSelectorInFrames(page, LOGIN_USER_SELECTOR, { timeout });
+    const passFieldMatch = await waitForSelectorInFrames(page, LOGIN_PASS_SELECTOR, { timeout });
 
-    await fillInput(page, LOGIN_USER_SELECTOR, LOGIN_USER);
-    await fillInput(page, LOGIN_PASS_SELECTOR, LOGIN_PASS);
+    await fillInput(userFieldMatch, LOGIN_USER_SELECTOR, LOGIN_USER);
+    await fillInput(passFieldMatch, LOGIN_PASS_SELECTOR, LOGIN_PASS);
 
     const preSubmitUrl = page.url();
 
     if (LOGIN_SUBMIT_SELECTOR) {
-      const submitButton = await page.$(LOGIN_SUBMIT_SELECTOR);
+      const submitButtonMatch = await findSelectorInFrames(page, LOGIN_SUBMIT_SELECTOR, { timeout: 2000 });
+      const submitButton = submitButtonMatch?.element;
       if (submitButton) {
         await submitButton.click();
       } else {
@@ -136,8 +137,7 @@ async function loginSuccessWait(page, waitTimeout, preSubmitUrl) {
   if (LOGIN_SUCCESS_SELECTOR) {
     attemptedChecks.push(`LOGIN_SUCCESS_SELECTOR (${LOGIN_SUCCESS_SELECTOR}) visible`);
     successChecks.push(
-      page
-        .waitForSelector(LOGIN_SUCCESS_SELECTOR, { timeout: waitTimeout })
+      waitForSelectorInFrames(page, LOGIN_SUCCESS_SELECTOR, { timeout: waitTimeout })
         .then(() => `LOGIN_SUCCESS_SELECTOR matched (${LOGIN_SUCCESS_SELECTOR})`)
     );
   } else {
@@ -150,20 +150,14 @@ async function loginSuccessWait(page, waitTimeout, preSubmitUrl) {
 
     attemptedChecks.push(`password field disappeared (${LOGIN_PASS_SELECTOR})`);
     successChecks.push(
-      page
-        .waitForFunction(
-          (passwordSelector) => !document.querySelector(passwordSelector),
-          { timeout: waitTimeout },
-          LOGIN_PASS_SELECTOR
-        )
+      waitForSelectorToDisappearInFrames(page, LOGIN_PASS_SELECTOR, waitTimeout)
         .then(() => `Password field disappeared (${LOGIN_PASS_SELECTOR})`)
     );
 
     if (LOGIN_POST_SUBMIT_SELECTOR) {
       attemptedChecks.push(`LOGIN_POST_SUBMIT_SELECTOR (${LOGIN_POST_SUBMIT_SELECTOR}) visible`);
       successChecks.push(
-        page
-          .waitForSelector(LOGIN_POST_SUBMIT_SELECTOR, { timeout: waitTimeout })
+        waitForSelectorInFrames(page, LOGIN_POST_SUBMIT_SELECTOR, { timeout: waitTimeout })
           .then(() => `LOGIN_POST_SUBMIT_SELECTOR matched (${LOGIN_POST_SUBMIT_SELECTOR})`)
       );
     }
@@ -187,13 +181,14 @@ async function loginSuccessWait(page, waitTimeout, preSubmitUrl) {
   }
 }
 
-async function fillInput(page, selector, value) {
-  await page.focus(selector);
-  await page.click(selector, { clickCount: 3 });
-  await page.keyboard.press('Backspace');
-  await page.type(selector, value, { delay: 20 });
+async function fillInput(fieldMatch, selector, value) {
+  const { frame, element } = fieldMatch;
+  await element.focus();
+  await element.click({ clickCount: 3 });
+  await frame.keyboard.press('Backspace');
+  await element.type(value, { delay: 20 });
 
-  await page.evaluate(
+  await frame.evaluate(
     ({ inputSelector, inputValue }) => {
       const input = document.querySelector(inputSelector);
       if (!input) {
@@ -215,7 +210,8 @@ async function acceptCookies(page) {
 
   for (const selector of selectors) {
     try {
-      const button = await page.$(selector);
+      const buttonMatch = await findSelectorInFrames(page, selector, { timeout: 1000 });
+      const button = buttonMatch?.element;
       if (!button) {
         continue;
       }
@@ -227,4 +223,60 @@ async function acceptCookies(page) {
       // Try the next candidate selector.
     }
   }
+}
+
+async function waitForSelectorInFrames(page, selector, { timeout }) {
+  const found = await findSelectorInFrames(page, selector, { timeout });
+  if (!found) {
+    throw new Error(`[login] Selector not found within timeout: ${selector}`);
+  }
+  return found;
+}
+
+async function findSelectorInFrames(page, selector, { timeout }) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeout) {
+    for (const frame of page.frames()) {
+      try {
+        const element = await frame.$(selector);
+        if (element) {
+          console.log(`[login] Selector "${selector}" matched in frame: ${frame.url() || '(no url)'}`);
+          return { frame, element };
+        }
+      } catch {
+        // Ignore detached frame errors and continue polling.
+      }
+    }
+    await sleep(200);
+  }
+
+  return null;
+}
+
+async function waitForSelectorToDisappearInFrames(page, selector, timeout) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeout) {
+    let found = false;
+    for (const frame of page.frames()) {
+      try {
+        const element = await frame.$(selector);
+        if (element) {
+          found = true;
+          break;
+        }
+      } catch {
+        // Ignore detached frame errors and continue polling.
+      }
+    }
+
+    if (!found) {
+      return;
+    }
+
+    await sleep(200);
+  }
+
+  throw new Error(`[login] Selector did not disappear within timeout: ${selector}`);
 }
