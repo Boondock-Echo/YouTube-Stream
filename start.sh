@@ -110,7 +110,7 @@ run_automated_login() {
 
   log "Running Puppeteer automated login..."
   if ! node /app/login.mjs; then
-    log "WARNING: Automated login failed; continuing with currently visible page."
+    log "WARNING: Automated login verification failed; continuing stream with currently visible page (may be unauthenticated)."
   fi
 }
 
