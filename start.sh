@@ -55,6 +55,11 @@ url_host() {
 
 start_system_dbus() {
   # Chromium can spam DBus connection errors if no system bus exists in the container.
+  if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && [[ ! "${DBUS_SESSION_BUS_ADDRESS}" =~ ^(unix|tcp): ]]; then
+    log "Ignoring invalid DBUS_SESSION_BUS_ADDRESS='${DBUS_SESSION_BUS_ADDRESS}'"
+    unset DBUS_SESSION_BUS_ADDRESS
+  fi
+
   if [[ -S /run/dbus/system_bus_socket ]]; then
     return 0
   fi
@@ -63,6 +68,33 @@ start_system_dbus() {
     install -d /run/dbus
     dbus-daemon --system --fork >/dev/null 2>&1 || true
   fi
+}
+
+wait_for_chrome_debugger() {
+  local debugger_url="http://127.0.0.1:${CHROME_DEBUG_PORT}/json/version"
+  local attempts i
+
+  attempts=$((LOGIN_TIMEOUT_MS / 500))
+  if (( attempts < 20 )); then
+    attempts=20
+  fi
+
+  for ((i=1; i<=attempts; i+=1)); do
+    if curl -fsS --max-time 2 "$debugger_url" >/dev/null 2>&1; then
+      log "Chromium DevTools endpoint is ready on port ${CHROME_DEBUG_PORT}."
+      return 0
+    fi
+
+    if ! kill -0 "$CHROME_PID" >/dev/null 2>&1; then
+      log "WARNING: Chromium exited before DevTools endpoint was reachable."
+      return 1
+    fi
+
+    sleep 0.5
+  done
+
+  log "WARNING: Chromium DevTools endpoint did not become ready at ${debugger_url}."
+  return 1
 }
 
 run_automated_login() {
@@ -190,6 +222,8 @@ if ! kill -0 "$CHROME_PID" >/dev/null 2>&1; then
   log "If you see a message about snap, install/use the apt chromium package and set CHROME_BIN=chromium."
   exit 1
 fi
+
+wait_for_chrome_debugger || true
 
 run_automated_login
 
